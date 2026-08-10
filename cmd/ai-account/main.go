@@ -43,6 +43,10 @@ const (
 	discoveryTimeout = 20 * time.Second
 )
 
+// version is stamped at build time with -ldflags "-X main.version=...".
+// It is logged once at startup so a running pod can be tied back to a commit.
+var version = "dev"
+
 func main() {
 	if err := run(); err != nil {
 		// The logger may not exist yet if configuration failed, so this goes
@@ -224,7 +228,10 @@ func serve(handler http.Handler, cfg *config.Config, log *slog.Logger) error {
 
 	errCh := make(chan error, 1)
 	go func() {
-		log.Info("listening", "addr", server.Addr, "public_base_url", cfg.PublicBaseURL.String())
+		log.Info("listening",
+			"addr", server.Addr,
+			"public_base_url", cfg.PublicBaseURL.String(),
+			"version", version)
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}

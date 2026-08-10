@@ -1,0 +1,9 @@
+.git
+.github
+*.md
+!README.md
+Dockerfile
+.dockerignore
+.gitignore
+dist/
+ai-account
