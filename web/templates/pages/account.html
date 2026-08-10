@@ -53,15 +53,15 @@
       {{template "guides.html" .}}
 
       <p class="fine-print">
-        Every guide reads the key from the <code>{{.EnvVar}}</code> environment
-        variable, so it never has to be written into a file you might commit.
+        Every guide reads the key from <code>{{.EnvVar}}</code>, so it never has
+        to sit in a file you might commit.
       </p>
     </div>
 
   </div>
   {{else}}
   <div class="empty-state">
-    <h1 class="empty-title">You do not have an API key yet.</h1>
+    <h1 class="empty-title">You don't have an API key yet.</h1>
     <p class="empty-body">Create one to connect a coding agent.</p>
     <a class="button button-primary" href="/keys/new">Create API key</a>
   </div>

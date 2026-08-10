@@ -65,6 +65,7 @@ type Config struct {
 type BrandConfig struct {
 	Name         string
 	ShortName    string
+	OrgName      string
 	Tagline      string
 	LogoFile     string
 	LogoAlt      string
@@ -81,6 +82,7 @@ const (
 	defaultLogLevel     = "info"
 	defaultAPIKeyPrefix = "llm_"
 	defaultBrandName    = "llm.birks.dev"
+	defaultBrandOrgName = "E-gineering"
 	defaultBrandTagline = "Private self-hosted AI endpoint"
 	defaultBrandAccent  = "#3b6fd6"
 
@@ -116,6 +118,7 @@ func Load() (*Config, error) {
 		Brand: BrandConfig{
 			Name:         lookupDefault("BRAND_NAME", defaultBrandName),
 			ShortName:    strings.TrimSpace(os.Getenv("BRAND_SHORT_NAME")),
+			OrgName:      lookupDefault("BRAND_ORG_NAME", defaultBrandOrgName),
 			Tagline:      lookupDefault("BRAND_TAGLINE", defaultBrandTagline),
 			LogoFile:     strings.TrimSpace(os.Getenv("BRAND_LOGO_FILE")),
 			LogoAlt:      strings.TrimSpace(os.Getenv("BRAND_LOGO_ALT")),

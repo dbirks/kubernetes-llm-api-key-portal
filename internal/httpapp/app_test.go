@@ -38,6 +38,20 @@ func newHarness(t *testing.T) *testHarness {
 // is the avatars-disabled configuration, which is what newHarness uses.
 func newHarnessWithPhotos(t *testing.T, photos PhotoStore) *testHarness {
 	t.Helper()
+	return newHarnessFull(t, photos, testOrgName)
+}
+
+// newHarnessWithOrg varies the organisation name, which the sign-in heading is
+// built from and which is legitimately absent in some deployments.
+func newHarnessWithOrg(t *testing.T, orgName string) *testHarness {
+	t.Helper()
+	return newHarnessFull(t, nil, orgName)
+}
+
+const testOrgName = "E-gineering"
+
+func newHarnessFull(t *testing.T, photos PhotoStore, orgName string) *testHarness {
+	t.Helper()
 
 	var logs bytes.Buffer
 	log := slog.New(slog.NewJSONHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
@@ -45,6 +59,7 @@ func newHarnessWithPhotos(t *testing.T, photos PhotoStore) *testHarness {
 	brandData, err := brand.Resolve(config.BrandConfig{
 		Name:      "llm.birks.dev",
 		ShortName: "llm.birks.dev",
+		OrgName:   orgName,
 		Tagline:   "Private self-hosted AI endpoint",
 		LogoAlt:   "llm.birks.dev",
 		Accent:    "#3b6fd6",
@@ -627,7 +642,7 @@ func TestEmptyStateInvitesCreation(t *testing.T) {
 	h := newHarness(t)
 	rec := h.do(t, httptest.NewRequest(http.MethodGet, "/account", nil), h.signIn(t, auth.FakeUser))
 
-	if !strings.Contains(rec.Body.String(), "do not have an API key yet") {
+	if !strings.Contains(rec.Body.String(), "don't have an API key yet") {
 		t.Error("the empty state message is missing")
 	}
 }
@@ -829,5 +844,34 @@ func TestLogoutDropsTheCachedPhoto(t *testing.T) {
 	}
 	if _, ok := photos.Get(auth.FakeUser.PhotoKey()); ok {
 		t.Error("photo is still cached after sign-out")
+	}
+}
+
+func TestSignInPageNamesTheOrganisation(t *testing.T) {
+	h := newHarness(t)
+	body := h.do(t, httptest.NewRequest(http.MethodGet, "/", nil), nil).Body.String()
+
+	if !strings.Contains(body, "Sign in to your "+testOrgName+" account") {
+		t.Errorf("sign-in page does not name the organisation; body:\n%s", body)
+	}
+	// The Microsoft mark and wording are fixed by Microsoft's brand rules.
+	if !strings.Contains(body, "Sign in with Microsoft") {
+		t.Error("sign-in page is missing the Microsoft button")
+	}
+	if !strings.Contains(body, "llm.birks.dev · Private self-hosted AI endpoint") {
+		t.Error("sign-in page does not show the service name and tagline")
+	}
+}
+
+// An operator who sets no organisation must not get "Sign in to your  account".
+func TestSignInHeadingDegradesWithoutAnOrganisation(t *testing.T) {
+	h := newHarnessWithOrg(t, "")
+	body := h.do(t, httptest.NewRequest(http.MethodGet, "/", nil), nil).Body.String()
+
+	if strings.Contains(body, "your  account") || strings.Contains(body, "to your account") {
+		t.Errorf("sign-in heading reads badly without an organisation; body:\n%s", body)
+	}
+	if !strings.Contains(body, "Sign in") {
+		t.Error("sign-in page lost its heading entirely")
 	}
 }

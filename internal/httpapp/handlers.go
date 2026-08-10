@@ -126,7 +126,7 @@ func (a *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 		a.log.Error("starting sign-in failed", "request_id", RequestIDFrom(r.Context()), "error", err)
 		a.renderError(w, r, http.StatusInternalServerError,
 			"We couldn't sign you in",
-			"Try again, or contact the service owner if the problem continues.")
+			"Try again. If it keeps happening, ask the service owner.")
 	}
 }
 
@@ -141,10 +141,10 @@ func (a *App) handleCallback(w http.ResponseWriter, r *http.Request) {
 		// a failed sign-in cannot be used to probe tenant membership.
 		a.log.Warn("sign-in failed", "request_id", RequestIDFrom(r.Context()), "error", err)
 		status := http.StatusUnauthorized
-		message := "Try again, or contact the service owner if the problem continues."
+		message := "Try again. If it keeps happening, ask the service owner."
 		if errors.Is(err, auth.ErrWrongTenant) {
 			status = http.StatusForbidden
-			message = "That account isn't allowed to use this service. Sign in with your work account, or contact the service owner."
+			message = "That account can't use this service. Try your work account, or ask the service owner."
 		}
 		a.renderError(w, r, status, "We couldn't sign you in", message)
 		return
@@ -182,8 +182,8 @@ func (a *App) handleAccount(w http.ResponseWriter, r *http.Request) {
 			"request_id", RequestIDFrom(r.Context()),
 			"entra_tid", own.TenantID, "entra_oid", own.ObjectID, "error", err)
 		a.renderError(w, r, http.StatusInternalServerError,
-			"We couldn't load your API keys",
-			"Nothing was changed. Try again in a moment.")
+			"We couldn't load your keys",
+			"Nothing changed. Try again in a moment.")
 		return
 	}
 
@@ -214,7 +214,7 @@ func (a *App) handleCreateKey(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		a.renderError(w, r, http.StatusBadRequest,
 			"We couldn't read that form",
-			"Nothing was changed. Go back and try again.")
+			"Nothing changed. Go back and try again.")
 		return
 	}
 	rawName := r.PostFormValue("name")
@@ -236,8 +236,8 @@ func (a *App) handleCreateKey(w http.ResponseWriter, r *http.Request) {
 			"request_id", RequestIDFrom(r.Context()),
 			"entra_tid", own.TenantID, "entra_oid", own.ObjectID, "error", err)
 		a.renderError(w, r, http.StatusInternalServerError,
-			"We couldn't create your API key",
-			"Nothing was changed. Try again.")
+			"We couldn't create your key",
+			"Nothing changed. Try again.")
 		return
 	}
 
@@ -292,7 +292,7 @@ func (a *App) handleRevokeKey(w http.ResponseWriter, r *http.Request) {
 		"entra_tid", own.TenantID, "entra_oid", own.ObjectID,
 		"operation", "revoke", "key_resource_name", id)
 
-	a.sealer.SetFlash(w, auth.FlashSuccess, "API key revoked. Anything using it will stop working.")
+	a.sealer.SetFlash(w, auth.FlashSuccess, "Key revoked. Anything using it stops working now.")
 	// Post/Redirect/Get, so a refresh does not re-submit the revocation.
 	http.Redirect(w, r, "/account", http.StatusSeeOther)
 }
@@ -302,16 +302,16 @@ func (a *App) handleRevokeKey(w http.ResponseWriter, r *http.Request) {
 func (a *App) renderKeyLookupError(w http.ResponseWriter, r *http.Request, own keystore.Owner, err error) {
 	if errors.Is(err, keystore.ErrNotFound) {
 		a.renderError(w, r, http.StatusNotFound,
-			"That API key no longer exists",
-			"It may already have been revoked.")
+			"That key no longer exists",
+			"It was probably revoked already.")
 		return
 	}
 	a.log.Error("key lookup failed",
 		"request_id", RequestIDFrom(r.Context()),
 		"entra_tid", own.TenantID, "entra_oid", own.ObjectID, "error", err)
 	a.renderError(w, r, http.StatusInternalServerError,
-		"We couldn't reach your API keys",
-		"Nothing was changed. Try again in a moment.")
+		"We couldn't reach your keys",
+		"Nothing changed. Try again in a moment.")
 }
 
 func (a *App) handleHealthz(w http.ResponseWriter, r *http.Request) {

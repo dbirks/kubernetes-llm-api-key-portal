@@ -2,18 +2,32 @@
 
 {{define "main"}}
 <div class="panel landing">
-  <h1>{{.Brand.Name}}</h1>
-  <p class="landing-tagline">{{.Brand.Tagline}}</p>
+  {{/*
+    The operator logo, when one is mounted. It sits above the heading rather
+    than beside it so the whole panel stays centred, and it is decorative here:
+    the heading right below already names the organisation, so a duplicate alt
+    would only make a screen reader say it twice.
+  */}}
+  {{if .Brand.HasLogo}}
+  <img class="landing-mark" src="{{.Brand.LogoURL}}" alt="" height="34" aria-hidden="true">
+  {{end}}
+
+  {{/*
+    OrgName is optional, so the heading degrades to a plain "Sign in" rather
+    than reading "Sign in to your  account".
+  */}}
+  <h1 class="landing-title">
+    {{if .Brand.OrgName}}Sign in to your {{.Brand.OrgName}} account{{else}}Sign in{{end}}
+  </h1>
+
+  <p class="landing-service">{{.Brand.Name}} · {{.Brand.Tagline}}</p>
 
   <p class="landing-copy">
-    Use your Microsoft work account to create an API key and connect
-    Claude Code, Pi, OpenCode, Codex, or Crush.
+    Create an API key and connect Claude Code, Pi, OpenCode, Codex, or Crush.
   </p>
 
   {{template "ms_button.html" .}}
 
-  <p class="landing-note">
-    Inference runs on self-hosted hardware. Access is for invited coworkers.
-  </p>
+  <p class="landing-note">Inference runs on self-hosted hardware.</p>
 </div>
 {{end}}

@@ -152,7 +152,7 @@ func (a *App) routes() http.Handler {
 			"sec_fetch_site", r.Header.Get("Sec-Fetch-Site"))
 		a.renderError(w, r, http.StatusForbidden,
 			"That request was blocked",
-			"For your safety this action must start from this site. Go back and try again.")
+			"This action has to start from this site. Go back and try again.")
 	}))
 
 	return chain(mux,

@@ -129,7 +129,7 @@ func (a *App) recoverPanics(next http.Handler) http.Handler {
 					"panic", fmt.Sprint(rec))
 				a.renderError(w, r, http.StatusInternalServerError,
 					"Something went wrong",
-					"Nothing was changed. Try again, or contact the service owner if the problem continues.")
+					"Nothing changed. Try again. If it keeps happening, ask the service owner.")
 			}
 		}()
 		next.ServeHTTP(w, r)

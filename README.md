@@ -214,6 +214,7 @@ This is not a white-label product; it is one deployment with a few things left a
 |---|---|---|
 | `BRAND_NAME` | `llm.birks.dev` | Company or service name. Appears in the header, page title, and footer. |
 | `BRAND_SHORT_NAME` | = `BRAND_NAME` | Shorter form for tight layouts. |
+| `BRAND_ORG_NAME` | `E-gineering` | Organisation whose work accounts sign in. Builds the sign-in heading, "Sign in to your … account". Leave empty for a plain "Sign in". |
 | `BRAND_TAGLINE` | `Private self-hosted AI endpoint` | One-line description on the landing page and footer. |
 | `BRAND_LOGO_FILE` | — | Path to a mounted PNG, JPEG, WebP, or SVG. Without one, a text wordmark is rendered. |
 | `BRAND_LOGO_ALT` | = `BRAND_NAME` | Alt text for the logo. |

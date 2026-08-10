@@ -38,6 +38,6 @@ func (a *App) mustRender(w http.ResponseWriter, r *http.Request, status int, nam
 			"template", name, "error", err)
 		a.renderError(w, r, http.StatusInternalServerError,
 			"Something went wrong",
-			"Nothing was changed. Try again, or contact the service owner if the problem continues.")
+			"Nothing changed. Try again. If it keeps happening, ask the service owner.")
 	}
 }

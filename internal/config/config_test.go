@@ -16,7 +16,7 @@ func setEnv(t *testing.T, env map[string]string) {
 		"SESSION_KEY", "KEYSTORE_MODE", "KUBERNETES_NAMESPACE",
 		"KUBERNETES_ALLOW_KUBECONFIG", "KUBECONFIG",
 		"API_KEY_PREFIX", "DEFAULT_MODEL", "INFERENCE_BASE_URL", "DEV_FAKE_AUTH",
-		"BRAND_NAME", "BRAND_SHORT_NAME", "BRAND_TAGLINE", "BRAND_LOGO_FILE",
+		"BRAND_NAME", "BRAND_SHORT_NAME", "BRAND_ORG_NAME", "BRAND_TAGLINE", "BRAND_LOGO_FILE",
 		"BRAND_LOGO_ALT", "BRAND_FAVICON_FILE", "BRAND_ACCENT", "BRAND_ACCENT_DARK",
 		"BRAND_SUPPORT_EMAIL", "BRAND_SUPPORT_URL",
 	}
@@ -362,5 +362,27 @@ func TestUnparseableAvatarsSettingKeepsTheDefault(t *testing.T) {
 		if !cfg.EntraAvatars {
 			t.Errorf("ENTRA_AVATARS=%q disabled avatars, want the default to hold", raw)
 		}
+	}
+}
+
+func TestBrandOrgNameDefaultAndOverride(t *testing.T) {
+	setEnv(t, productionEnv())
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Brand.OrgName != defaultBrandOrgName {
+		t.Errorf("OrgName = %q, want the default %q", cfg.Brand.OrgName, defaultBrandOrgName)
+	}
+
+	env := productionEnv()
+	env["BRAND_ORG_NAME"] = "Acme Corp"
+	setEnv(t, env)
+	cfg, err = Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Brand.OrgName != "Acme Corp" {
+		t.Errorf("OrgName = %q, want Acme Corp", cfg.Brand.OrgName)
 	}
 }

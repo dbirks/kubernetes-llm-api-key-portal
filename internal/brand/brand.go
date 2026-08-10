@@ -40,6 +40,12 @@ type Brand struct {
 	ShortName string
 	Tagline   string
 
+	// OrgName is the organisation whose work accounts sign in, used in the
+	// sign-in heading. It is separate from Name because the two answer
+	// different questions: Name is what this service is called, OrgName is
+	// whose account you are being asked for. May be empty.
+	OrgName string
+
 	HasLogo bool
 	LogoURL string
 	LogoAlt string
@@ -77,6 +83,13 @@ func Resolve(cfg config.BrandConfig, log *slog.Logger) (*Brand, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Optional: an empty OrgName means the sign-in page drops the "your X
+	// account" framing rather than failing to start. Anyone constructing a
+	// BrandConfig directly, tests included, gets that for free.
+	orgName, err := cleanOptionalText(cfg.OrgName, "BRAND_ORG_NAME")
+	if err != nil {
+		return nil, err
+	}
 	logoAlt, err := cleanText(orDefault(cfg.LogoAlt, name), "BRAND_LOGO_ALT")
 	if err != nil {
 		return nil, err
@@ -86,6 +99,7 @@ func Resolve(cfg config.BrandConfig, log *slog.Logger) (*Brand, error) {
 		Name:         name,
 		ShortName:    shortName,
 		Tagline:      tagline,
+		OrgName:      orgName,
 		LogoAlt:      logoAlt,
 		SupportEmail: cfg.SupportEmail,
 		SupportURL:   cfg.SupportURL,
@@ -178,6 +192,14 @@ func (b *Brand) Stylesheet() []byte { return b.stylesheet }
 // cleanText validates an operator-supplied display string. Control characters
 // are rejected outright: they cannot render usefully and they make log output
 // and terminal debugging confusing.
+// cleanOptionalText is cleanText for strings that may legitimately be absent.
+func cleanOptionalText(s, field string) (string, error) {
+	if strings.TrimSpace(s) == "" {
+		return "", nil
+	}
+	return cleanText(s, field)
+}
+
 func cleanText(s, field string) (string, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {

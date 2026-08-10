@@ -543,8 +543,19 @@ hr {
   padding: 52px 40px 46px;
   text-align: center;
 }
-.landing h1 { font-size: 20px; margin-bottom: 7px; }
-.landing-tagline { font-size: 14px; color: var(--text-muted); margin-bottom: 22px; }
+/* The mark is the operator's own logo file, so it is sized by height and left
+   to keep its own aspect ratio and colour. */
+.landing-mark {
+  display: block;
+  width: auto;
+  margin: 0 auto 18px;
+}
+.landing-title {
+  font-size: 20px;
+  letter-spacing: -.02em;
+  margin-bottom: 7px;
+}
+.landing-service { font-size: 14px; color: var(--text-muted); margin-bottom: 22px; }
 .landing-copy {
   margin: 0 auto 26px;
   max-width: 430px;

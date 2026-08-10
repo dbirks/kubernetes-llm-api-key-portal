@@ -368,3 +368,29 @@ func TestUnknownAssetPathIs404(t *testing.T) {
 		t.Errorf("unknown asset = %d, want 404", rec.Code)
 	}
 }
+
+// The organisation name is optional: a deployment that omits it must still
+// start, and the sign-in page drops the "your X account" framing instead.
+func TestOrgNameIsOptional(t *testing.T) {
+	cfg := config.BrandConfig{
+		Name:    "llm.example",
+		Tagline: "Private endpoint",
+		Accent:  "#3b6fd6",
+	}
+	b, err := Resolve(cfg, quietLogger())
+	if err != nil {
+		t.Fatalf("Resolve without an org name: %v", err)
+	}
+	if b.OrgName != "" {
+		t.Errorf("OrgName = %q, want empty", b.OrgName)
+	}
+
+	cfg.OrgName = "  E-gineering  "
+	b, err = Resolve(cfg, quietLogger())
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	if b.OrgName != "E-gineering" {
+		t.Errorf("OrgName = %q, want it trimmed to E-gineering", b.OrgName)
+	}
+}
