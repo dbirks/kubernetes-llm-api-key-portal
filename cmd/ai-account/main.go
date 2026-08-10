@@ -129,17 +129,16 @@ func buildKeyStore(cfg *config.Config, log *slog.Logger) (keystore.KeyStore, err
 			return nil, fmt.Errorf("kubernetes keystore: %w", err)
 		}
 		store, err := k8sstore.New(k8sstore.Options{
-			Client:      client,
-			Namespace:   cfg.KubernetesNamespace,
-			LabelDomain: cfg.SecretLabelDomain,
-			KeyPrefix:   cfg.APIKeyPrefix,
+			Client:    client,
+			Namespace: cfg.KubernetesNamespace,
+			KeyPrefix: cfg.APIKeyPrefix,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("kubernetes keystore: %w", err)
 		}
 		log.Info("using kubernetes keystore",
 			"namespace", cfg.KubernetesNamespace,
-			"label_domain", cfg.SecretLabelDomain)
+			"label_domain", k8sstore.LabelDomain)
 		return store, nil
 
 	default:

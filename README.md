@@ -3,6 +3,31 @@
 A small server-rendered Go web application that lets trusted colleagues sign in with a Microsoft
 work account, create an API key for a self-hosted LLM endpoint, and connect their coding agent.
 
+## Read this first: it is opinionated
+
+This is not a general-purpose product. It is built for one specific deployment — a self-hosted
+vLLM endpoint at `ai.birks.dev`, running on a home Kubernetes cluster, used by colleagues at
+[E-gineering](https://www.e-gineering.com) who sign in with their work Microsoft accounts.
+
+Those opinions are baked in rather than abstracted away:
+
+- **Microsoft Entra ID is the only way to sign in.** There is no local account, no password, no
+  second identity provider, and no plan for one.
+- **One Entra tenant.** Anyone in the configured tenant may sign in. The code keeps tenant ID
+  explicit throughout so a future multi-tenant allowlist stays possible, but v1 accepts exactly one.
+- **kgateway enforces the keys.** The Secret shape, the `extauth.solo.io/apikey` type, and the
+  `ai.birks.dev/*` label prefix exist because that is what kgateway's built-in API-key auth
+  selects on. `ai.birks.dev` is a compile-time constant in
+  `internal/keystore/kubernetes`, not a setting — it is one half of a contract with the
+  `TrafficPolicy` in the cluster repository, and the two must change together.
+- **vLLM is the backend.** The five client setup guides assume the Anthropic Messages API,
+  OpenAI-compatible endpoints, and the Responses API are all served from the same origin.
+- **Kubernetes Secrets are the database.** There is no SQL, no ORM, and no user table.
+
+If you want to run this somewhere else, it will work — the branding, hostname, tenant, namespace,
+and model are all configuration — but expect to change the label constant and re-check the gateway
+contract. Treat it as a starting point, not a product.
+
 ```
 Microsoft Entra ID   ->  who is this person?
 This portal          ->  may they create and revoke their own credentials?
@@ -130,7 +155,6 @@ startup failure, and every problem is reported at once rather than one per resta
 | `KEYSTORE_MODE` | `memory` | `memory` or `kubernetes`. |
 | `KUBERNETES_NAMESPACE` | — | Required when `KEYSTORE_MODE=kubernetes`. |
 | `KUBERNETES_ALLOW_KUBECONFIG` | `false` | Permit falling back to a local kubeconfig outside a cluster. |
-| `SECRET_LABEL_DOMAIN` | `ai.birks.dev` | Prefix for Secret labels and annotations. Must match the gateway's `secretSelector`. |
 | `API_KEY_PREFIX` | `llm_` | Prefix on generated credentials. |
 | `DEFAULT_MODEL` | — | Served model name used in the setup snippets. |
 | `INFERENCE_BASE_URL` | `PUBLIC_BASE_URL` | Set only if `/v1/*` lives on a different hostname than the portal. |
@@ -149,13 +173,16 @@ service creates.
 
 ## Branding
 
-The same image can be deployed under a different company's name, logo, and colour without a
-rebuild. Everything below is a plain environment variable, so in Kubernetes it is one ConfigMap for
-the strings and one mounted volume for the image files.
+The defaults are this deployment's own identity — "Birks AI", indigo accent, no logo. The knobs
+below exist so the portal does not look wrong when it is run somewhere else, and so a logo can be
+dropped in without a rebuild. In Kubernetes this is one ConfigMap for the strings and one mounted
+volume for the image files.
+
+This is not a white-label product; it is one deployment with a few things left adjustable.
 
 | Variable | Default | Description |
 |---|---|---|
-| `BRAND_NAME` | `AI Portal` | Company or service name. Appears in the header, page title, and footer. |
+| `BRAND_NAME` | `Birks AI` | Company or service name. Appears in the header, page title, and footer. |
 | `BRAND_SHORT_NAME` | = `BRAND_NAME` | Shorter form for tight layouts. |
 | `BRAND_TAGLINE` | `Private self-hosted AI endpoint` | One-line description on the landing page and footer. |
 | `BRAND_LOGO_FILE` | — | Path to a mounted PNG, JPEG, WebP, or SVG. Without one, a text wordmark is rendered. |
@@ -269,7 +296,10 @@ stringData:
   client-<opaque-id>: "llm_<credential>"
 ```
 
-The label prefix comes from `SECRET_LABEL_DOMAIN` and must match the gateway's `secretSelector`.
+The `ai.birks.dev` prefix is the `LabelDomain` constant in `internal/keystore/kubernetes`. It must
+match the gateway's `secretSelector`. Changing it is a code change on purpose: as an environment
+variable it looked like a per-deployment preference, and a mismatch silently stops every key from
+authenticating with no error anywhere.
 
 Secrets are immutable: keys are created and deleted, never edited. Rotation is create replacement →
 verify → revoke old.
@@ -381,6 +411,28 @@ git diff internal/onboarding/testdata
 
 CI fails if the goldens are stale.
 
+### Testing against a real cluster
+
+The Kubernetes store is unit-tested with `client-go`'s fake clientset, which checks the object we
+build and our own ownership logic. It cannot tell you whether the API server accepts that object,
+whether your RBAC is right, or whether `immutable: true` is genuinely enforced — the fake simulates
+none of that.
+
+For those, there is an opt-in integration test:
+
+```bash
+kubectl create namespace portal-itest
+PORTAL_INTEGRATION_NAMESPACE=portal-itest go test ./internal/keystore/kubernetes -run Integration -v
+kubectl delete namespace portal-itest
+```
+
+It creates real Secrets through your current kubeconfig context and deletes them on the way out.
+Point it at a scratch namespace. Without the environment variable it skips, so `go test ./...` and
+CI are unaffected.
+
+What still is not covered anywhere in this repository: whether kgateway actually accepts the
+credential. That needs the checklist at the end of this file.
+
 ### Layout
 
 ```
@@ -401,7 +453,7 @@ web/                 templates and static assets, embedded via go:embed
 The credential shape depends on kgateway's contract, which cannot be verified from this repository.
 Before pointing colleagues at the portal, confirm against the kgateway release actually deployed:
 
-- [ ] The `TrafficPolicy` `secretSelector` matches `<SECRET_LABEL_DOMAIN>/api-key=true`.
+- [ ] The `TrafficPolicy` `secretSelector` matches `ai.birks.dev/api-key=true`.
 - [ ] `Authorization: Bearer <key>` is accepted (OpenAI-compatible SDKs, Claude Code gateway mode).
 - [ ] `X-Api-Key: <key>` is accepted where Anthropic-style clients need it.
 - [ ] A revoked key stops authenticating after the normal watch propagation delay.

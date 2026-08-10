@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -43,11 +42,6 @@ type Config struct {
 	KubernetesAllowKubecfg bool
 	KubernetesKubeconfig   string
 
-	// SecretLabelDomain prefixes the labels and annotations on API-key Secrets.
-	// It is the contract with the gateway's secretSelector, so it must match
-	// the TrafficPolicy in the cluster repository.
-	SecretLabelDomain string
-
 	APIKeyPrefix     string
 	DefaultModel     string
 	InferenceBaseURL *url.URL
@@ -77,8 +71,7 @@ const (
 	defaultPort         = 8080
 	defaultLogLevel     = "info"
 	defaultAPIKeyPrefix = "llm_"
-	defaultLabelDomain  = "ai.birks.dev"
-	defaultBrandName    = "AI Portal"
+	defaultBrandName    = "Birks AI"
 	defaultBrandTagline = "Private self-hosted AI endpoint"
 	defaultBrandAccent  = "#4f46e5"
 
@@ -104,7 +97,6 @@ func Load() (*Config, error) {
 		EntraClientID:     strings.TrimSpace(os.Getenv("ENTRA_CLIENT_ID")),
 		EntraClientSecret: os.Getenv("ENTRA_CLIENT_SECRET"),
 
-		SecretLabelDomain:      lookupDefault("SECRET_LABEL_DOMAIN", defaultLabelDomain),
 		KubernetesNamespace:    strings.TrimSpace(os.Getenv("KUBERNETES_NAMESPACE")),
 		KubernetesKubeconfig:   strings.TrimSpace(os.Getenv("KUBECONFIG")),
 		KubernetesAllowKubecfg: boolEnv("KUBERNETES_ALLOW_KUBECONFIG"),
@@ -178,11 +170,6 @@ func Load() (*Config, error) {
 	if cfg.APIKeyPrefix == "" {
 		fail("API_KEY_PREFIX must not be empty")
 	}
-	// Kubernetes requires the prefix part of a label key to be a DNS subdomain.
-	// Catching it here turns a per-request API rejection into a startup error.
-	if !dnsSubdomain.MatchString(cfg.SecretLabelDomain) || len(cfg.SecretLabelDomain) > 253 {
-		fail("SECRET_LABEL_DOMAIN must be a DNS subdomain such as ai.example.com, got %q", cfg.SecretLabelDomain)
-	}
 
 	// Authentication. The dev bypass replaces Entra entirely, so its
 	// requirements only apply to real deployments.
@@ -244,10 +231,6 @@ func (c *Config) RedirectURL() string {
 func (c *Config) Addr() string {
 	return ":" + strconv.Itoa(c.Port)
 }
-
-// dnsSubdomain matches the RFC 1123 subdomain form Kubernetes requires for the
-// prefix of a label or annotation key.
-var dnsSubdomain = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`)
 
 func parseBaseURL(raw string) (*url.URL, error) {
 	u, err := url.Parse(raw)

@@ -29,11 +29,17 @@ const SecretType = "extauth.solo.io/apikey"
 // secretNamePrefix keeps generated Secrets identifiable in a shared namespace.
 const secretNamePrefix = "llm-key-"
 
-// Label and annotation keys, built from a configurable domain.
+// LabelDomain prefixes every label and annotation this package writes.
 //
-// The domain is the contract between this portal and the gateway's
-// secretSelector, so changing it means changing the TrafficPolicy in the
-// cluster repository at the same time. It is not a branding knob.
+// It is a constant, not configuration. This value is one half of a contract
+// with the gateway's TrafficPolicy secretSelector in the cluster repository,
+// and the two must be changed together in the same breath. Exposing it as an
+// environment variable made it look like a per-deployment preference, which
+// invited exactly the mismatch that silently stops every key from
+// authenticating.
+const LabelDomain = "ai.birks.dev"
+
+// Label and annotation key suffixes, joined to LabelDomain.
 const (
 	labelAPIKey   = "api-key"
 	labelOwnerOID = "owner-oid"
@@ -62,9 +68,6 @@ type Options struct {
 	// label, only by namespace and name.
 	Namespace string
 
-	// LabelDomain prefixes every label and annotation, e.g. "ai.birks.dev".
-	LabelDomain string
-
 	// KeyPrefix is prepended to generated credentials, e.g. "llm_".
 	KeyPrefix string
 }
@@ -73,7 +76,6 @@ type Options struct {
 type Store struct {
 	client    kubernetes.Interface
 	namespace string
-	domain    string
 	keyPrefix string
 }
 
@@ -85,18 +87,14 @@ func New(opts Options) (*Store, error) {
 	if opts.Namespace == "" {
 		return nil, errors.New("namespace is required")
 	}
-	if opts.LabelDomain == "" {
-		return nil, errors.New("label domain is required")
-	}
 	return &Store{
 		client:    opts.Client,
 		namespace: opts.Namespace,
-		domain:    opts.LabelDomain,
 		keyPrefix: opts.KeyPrefix,
 	}, nil
 }
 
-func (s *Store) label(name string) string { return s.domain + "/" + name }
+func (s *Store) label(name string) string { return LabelDomain + "/" + name }
 
 func (s *Store) secrets() typedcorev1.SecretInterface {
 	return s.client.CoreV1().Secrets(s.namespace)

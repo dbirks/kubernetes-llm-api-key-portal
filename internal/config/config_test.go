@@ -14,7 +14,7 @@ func setEnv(t *testing.T, env map[string]string) {
 		"PORT", "PUBLIC_BASE_URL", "LOG_LEVEL",
 		"ENTRA_TENANT_ID", "ENTRA_CLIENT_ID", "ENTRA_CLIENT_SECRET",
 		"SESSION_KEY", "KEYSTORE_MODE", "KUBERNETES_NAMESPACE",
-		"KUBERNETES_ALLOW_KUBECONFIG", "KUBECONFIG", "SECRET_LABEL_DOMAIN",
+		"KUBERNETES_ALLOW_KUBECONFIG", "KUBECONFIG",
 		"API_KEY_PREFIX", "DEFAULT_MODEL", "INFERENCE_BASE_URL", "DEV_FAKE_AUTH",
 		"BRAND_NAME", "BRAND_SHORT_NAME", "BRAND_TAGLINE", "BRAND_LOGO_FILE",
 		"BRAND_LOGO_ALT", "BRAND_FAVICON_FILE", "BRAND_ACCENT", "BRAND_ACCENT_DARK",
@@ -247,37 +247,6 @@ func TestDevFakeAuthGuardRails(t *testing.T) {
 	})
 }
 
-func TestSecretLabelDomainValidation(t *testing.T) {
-	tests := []struct {
-		value   string
-		wantErr bool
-	}{
-		{value: "ai.birks.dev"},
-		{value: "example.com"},
-		{value: "acme"},
-		{value: "Ai.Birks.Dev", wantErr: true},
-		{value: "ai..dev", wantErr: true},
-		{value: "-leading.dev", wantErr: true},
-		{value: "has_underscore.dev", wantErr: true},
-		{value: "has space.dev", wantErr: true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.value, func(t *testing.T) {
-			env := productionEnv()
-			env["SECRET_LABEL_DOMAIN"] = tt.value
-			setEnv(t, env)
-
-			_, err := Load()
-			if tt.wantErr && err == nil {
-				t.Errorf("Load accepted SECRET_LABEL_DOMAIN=%q", tt.value)
-			}
-			if !tt.wantErr && err != nil {
-				t.Errorf("Load rejected SECRET_LABEL_DOMAIN=%q: %v", tt.value, err)
-			}
-		})
-	}
-}
-
 func TestPortValidation(t *testing.T) {
 	for _, value := range []string{"0", "-1", "70000", "eight thousand"} {
 		env := productionEnv()
@@ -313,8 +282,9 @@ func TestBrandDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if cfg.Brand.Name != defaultBrandName {
-		t.Errorf("Brand.Name = %q, want %q", cfg.Brand.Name, defaultBrandName)
+	// The default is this deployment's own identity, not a generic placeholder.
+	if cfg.Brand.Name != "Birks AI" {
+		t.Errorf("Brand.Name = %q, want the built-in default", cfg.Brand.Name)
 	}
 	// ShortName and LogoAlt fall back to the name so templates never render
 	// an empty label.
@@ -328,8 +298,8 @@ func TestBrandDefaults(t *testing.T) {
 
 func TestBrandOverrides(t *testing.T) {
 	env := productionEnv()
-	env["BRAND_NAME"] = "Birks AI"
-	env["BRAND_SHORT_NAME"] = "Birks"
+	env["BRAND_NAME"] = "Acme AI"
+	env["BRAND_SHORT_NAME"] = "Acme"
 	env["BRAND_ACCENT"] = "#0f766e"
 	env["BRAND_SUPPORT_EMAIL"] = "help@birks.dev"
 	setEnv(t, env)
@@ -338,11 +308,11 @@ func TestBrandOverrides(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if cfg.Brand.Name != "Birks AI" || cfg.Brand.ShortName != "Birks" {
+	if cfg.Brand.Name != "Acme AI" || cfg.Brand.ShortName != "Acme" {
 		t.Errorf("brand names not applied: %+v", cfg.Brand)
 	}
 	// LogoAlt still falls back to the full name, not the short one.
-	if cfg.Brand.LogoAlt != "Birks AI" {
+	if cfg.Brand.LogoAlt != "Acme AI" {
 		t.Errorf("Brand.LogoAlt = %q, want the full brand name", cfg.Brand.LogoAlt)
 	}
 	if cfg.Brand.Accent != "#0f766e" || cfg.Brand.SupportEmail != "help@birks.dev" {

@@ -16,7 +16,8 @@ import (
 
 const (
 	testNamespace = "llm-access"
-	testDomain    = "ai.birks.dev"
+	// The label prefix is a constant contract with the gateway, not a setting.
+	testDomain = LabelDomain
 )
 
 var (
@@ -37,10 +38,9 @@ func newTestStore(t *testing.T, objects ...runtime.Object) (*Store, *fake.Client
 	t.Helper()
 	client := fake.NewClientset(objects...)
 	store, err := New(Options{
-		Client:      client,
-		Namespace:   testNamespace,
-		LabelDomain: testDomain,
-		KeyPrefix:   "llm_",
+		Client:    client,
+		Namespace: testNamespace,
+		KeyPrefix: "llm_",
 	})
 	if err != nil {
 		t.Fatalf("New: %v", err)
@@ -255,9 +255,8 @@ func TestNewRequiresConfiguration(t *testing.T) {
 		name string
 		opts Options
 	}{
-		{"no client", Options{Namespace: "n", LabelDomain: "d"}},
-		{"no namespace", Options{Client: client, LabelDomain: "d"}},
-		{"no label domain", Options{Client: client, Namespace: "n"}},
+		{"no client", Options{Namespace: "n"}},
+		{"no namespace", Options{Client: client}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
