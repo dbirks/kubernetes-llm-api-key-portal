@@ -37,7 +37,13 @@ const secretNamePrefix = "llm-key-"
 // environment variable made it look like a per-deployment preference, which
 // invited exactly the mismatch that silently stops every key from
 // authenticating.
-const LabelDomain = "ai.birks.dev"
+//
+// Deliberately not a hostname. A label prefix outlives whatever DNS name the
+// portal happens to be served from, and burying the current one here would
+// mean either a misleading label or a migration of every Secret the next time
+// the site moves. Kubernetes accepts any DNS subdomain, including a single
+// segment like this one.
+const LabelDomain = "llm-portal"
 
 // Label and annotation key suffixes, joined to LabelDomain.
 const (

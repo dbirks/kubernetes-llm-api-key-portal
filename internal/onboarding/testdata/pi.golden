@@ -1,15 +1,15 @@
 id: pi
 name: Pi
 
-Register Birks AI as a custom OpenAI-compatible provider in Pi's model configuration.
+Register llm.birks.dev as a custom OpenAI-compatible provider in Pi's model configuration.
 
 --- file ~/.pi/agent/models.json (json) ---
 {
   "providers": {
-    "birks-ai": {
-      "baseUrl": "https://ai.birks.dev/v1",
+    "llm-birks-dev": {
+      "baseUrl": "https://llm.birks.dev/v1",
       "api": "openai-completions",
-      "apiKey": "BIRKS_AI_API_KEY",
+      "apiKey": "LLM_BIRKS_DEV_API_KEY",
       "authHeader": true,
       "models": [
         { "id": "Qwen3-Coder-30B" }
@@ -19,14 +19,14 @@ Register Birks AI as a custom OpenAI-compatible provider in Pi's model configura
 }
 
 --- commands (bash) ---
-export BIRKS_AI_API_KEY="YOUR_API_KEY"
+export LLM_BIRKS_DEV_API_KEY="YOUR_API_KEY"
 
 pi
 
 --- notes ---
-- The apiKey field names an environment variable, not the credential itself, so BIRKS_AI_API_KEY stays out of the file.
+- The apiKey field names an environment variable, not the credential itself, so LLM_BIRKS_DEV_API_KEY stays out of the file.
 - authHeader: true makes Pi send Authorization: Bearer, which is what the gateway expects.
 - If you already have a models.json, merge the providers entry rather than replacing the file.
 
 --- agent prompt ---
-Configure Pi on this machine to use my self-hosted Birks AI endpoint at https://ai.birks.dev. Add a custom provider to ~/.pi/agent/models.json using the openai-completions API with authHeader enabled, merging with any existing providers. Use the model "Qwen3-Coder-30B". Read the API key from the BIRKS_AI_API_KEY environment variable. Do not write the key itself into any file in a git repository, and do not print it. Preserve my existing unrelated configuration.
+Configure Pi on this machine to use my self-hosted llm.birks.dev endpoint at https://llm.birks.dev. Add a custom provider to ~/.pi/agent/models.json using the openai-completions API with authHeader enabled, merging with any existing providers. Use the model "Qwen3-Coder-30B". Read the API key from the LLM_BIRKS_DEV_API_KEY environment variable. Do not write the key itself into any file in a git repository, and do not print it. Preserve my existing unrelated configuration.

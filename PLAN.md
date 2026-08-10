@@ -256,7 +256,7 @@ Brief §17 plus branding and dev flags.
 
 ```
 PORT=8080
-PUBLIC_BASE_URL=https://ai.birks.dev
+PUBLIC_BASE_URL=https://llm.birks.dev
 LOG_LEVEL=info
 
 ENTRA_TENANT_ID=<uuid>

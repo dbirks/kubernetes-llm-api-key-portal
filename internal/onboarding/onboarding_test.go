@@ -21,9 +21,9 @@ var update = flag.Bool("update", false, "rewrite golden files")
 
 func testParams() Params {
 	return Params{
-		BaseURL:   "https://ai.birks.dev",
+		BaseURL:   "https://llm.birks.dev",
 		Model:     "Qwen3-Coder-30B",
-		BrandName: "Birks AI",
+		BrandName: "llm.birks.dev",
 	}
 }
 
@@ -99,7 +99,7 @@ func TestGuidesAreWellFormed(t *testing.T) {
 				t.Error("guide has nothing to copy")
 			}
 			// The endpoint has to appear somewhere the user can see it.
-			if !strings.Contains(render(g), "ai.birks.dev") {
+			if !strings.Contains(render(g), "llm.birks.dev") {
 				t.Error("guide never mentions the endpoint")
 			}
 		})

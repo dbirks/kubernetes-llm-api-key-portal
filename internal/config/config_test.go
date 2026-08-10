@@ -35,7 +35,7 @@ func validKey() string {
 
 func productionEnv() map[string]string {
 	return map[string]string{
-		"PUBLIC_BASE_URL":     "https://ai.birks.dev",
+		"PUBLIC_BASE_URL":     "https://llm.birks.dev",
 		"ENTRA_TENANT_ID":     "11111111-1111-1111-1111-111111111111",
 		"ENTRA_CLIENT_ID":     "22222222-2222-2222-2222-222222222222",
 		"ENTRA_CLIENT_SECRET": "shhh",
@@ -61,7 +61,7 @@ func TestLoadProductionDefaults(t *testing.T) {
 	if cfg.APIKeyPrefix != defaultAPIKeyPrefix {
 		t.Errorf("APIKeyPrefix = %q, want %q", cfg.APIKeyPrefix, defaultAPIKeyPrefix)
 	}
-	if got, want := cfg.RedirectURL(), "https://ai.birks.dev/auth/callback"; got != want {
+	if got, want := cfg.RedirectURL(), "https://llm.birks.dev/auth/callback"; got != want {
 		t.Errorf("RedirectURL() = %q, want %q", got, want)
 	}
 	if got, want := cfg.EntraIssuerURL(), "https://login.microsoftonline.com/"+cfg.EntraTenantID+"/v2.0"; got != want {
@@ -146,14 +146,14 @@ func TestPublicBaseURLValidation(t *testing.T) {
 		value   string
 		wantErr bool
 	}{
-		{value: "https://ai.birks.dev"},
-		{value: "https://ai.birks.dev/"},
+		{value: "https://llm.birks.dev"},
+		{value: "https://llm.birks.dev/"},
 		{value: "http://localhost:8080"},
 		{value: "http://127.0.0.1:8080"},
 		// Plain http off-loopback would mean cookies without Secure in production.
-		{value: "http://ai.birks.dev", wantErr: true},
-		{value: "ftp://ai.birks.dev", wantErr: true},
-		{value: "ai.birks.dev", wantErr: true},
+		{value: "http://llm.birks.dev", wantErr: true},
+		{value: "ftp://llm.birks.dev", wantErr: true},
+		{value: "llm.birks.dev", wantErr: true},
 		{value: "https://", wantErr: true},
 	}
 	for _, tt := range tests {
@@ -271,7 +271,7 @@ func TestInferenceBaseURLCanDiffer(t *testing.T) {
 	if cfg.InferenceBaseURL.String() != "https://llm.birks.dev" {
 		t.Errorf("InferenceBaseURL = %q", cfg.InferenceBaseURL)
 	}
-	if cfg.PublicBaseURL.String() != "https://ai.birks.dev" {
+	if cfg.PublicBaseURL.String() != "https://llm.birks.dev" {
 		t.Errorf("PublicBaseURL was overwritten: %q", cfg.PublicBaseURL)
 	}
 }

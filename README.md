@@ -16,13 +16,10 @@ Those opinions are baked in rather than abstracted away:
 - **One Entra tenant.** Anyone in the configured tenant may sign in. The code keeps tenant ID
   explicit throughout so a future multi-tenant allowlist stays possible, but v1 accepts exactly one.
 - **kgateway enforces the keys.** The Secret shape, the `extauth.solo.io/apikey` type, and the
-  `ai.birks.dev/*` label prefix exist because that is what kgateway's built-in API-key auth
-  selects on. `ai.birks.dev` is a compile-time constant in
+  `llm-portal/*` label prefix exist because that is what kgateway's built-in API-key auth
+  selects on. `llm-portal` is a compile-time constant in
   `internal/keystore/kubernetes`, not a setting — it is one half of a contract with the
   `TrafficPolicy` in the cluster repository, and the two must change together.
-  **The label prefix and the public hostname have diverged on purpose.** The site is served at
-  `llm.birks.dev`; the labels stay `ai.birks.dev`. Renaming the labels to match the hostname
-  would break every existing key, silently — see the Secret contract below.
 - **vLLM is the backend.** The five client setup guides assume the Anthropic Messages API,
   OpenAI-compatible endpoints, and the Responses API are all served from the same origin.
 - **Kubernetes Secrets are the database.** There is no SQL, no ORM, and no user table.
@@ -286,25 +283,29 @@ metadata:
   name: llm-key-<opaque-id>
   namespace: llm-access
   labels:
-    ai.birks.dev/api-key: "true"          # the gateway's selector
-    ai.birks.dev/owner-tid: "<entra-tenant-id>"
-    ai.birks.dev/owner-oid: "<entra-object-id>"
+    llm-portal/api-key: "true"          # the gateway's selector
+    llm-portal/owner-tid: "<entra-tenant-id>"
+    llm-portal/owner-oid: "<entra-object-id>"
   annotations:
-    ai.birks.dev/display-name: "MacBook Claude Code"
-    ai.birks.dev/key-suffix: "A1b2C3"
-    ai.birks.dev/owner-display-name: "Alice Example"
-    ai.birks.dev/owner-email: "alice@example.com"
-    ai.birks.dev/managed-by: "ai-account"
+    llm-portal/display-name: "MacBook Claude Code"
+    llm-portal/key-suffix: "A1b2C3"
+    llm-portal/owner-display-name: "Alice Example"
+    llm-portal/owner-email: "alice@example.com"
+    llm-portal/managed-by: "ai-account"
 type: extauth.solo.io/apikey
 immutable: true
 stringData:
   client-<opaque-id>: "llm_<credential>"
 ```
 
-The `ai.birks.dev` prefix is the `LabelDomain` constant in `internal/keystore/kubernetes`. It must
+The `llm-portal` prefix is the `LabelDomain` constant in `internal/keystore/kubernetes`. It must
 match the gateway's `secretSelector`. Changing it is a code change on purpose: as an environment
 variable it looked like a per-deployment preference, and a mismatch silently stops every key from
 authenticating with no error anywhere.
+
+It is deliberately not a hostname. A label prefix outlives whatever DNS name the portal is served
+from, so embedding the current one would mean either a stale label or migrating every Secret the
+next time the site moves.
 
 Secrets are immutable: keys are created and deleted, never edited. Rotation is create replacement →
 verify → revoke old.
@@ -458,7 +459,7 @@ web/                 templates and static assets, embedded via go:embed
 The credential shape depends on kgateway's contract, which cannot be verified from this repository.
 Before pointing colleagues at the portal, confirm against the kgateway release actually deployed:
 
-- [ ] The `TrafficPolicy` `secretSelector` matches `ai.birks.dev/api-key=true`.
+- [ ] The `TrafficPolicy` `secretSelector` matches `llm-portal/api-key=true`.
 - [ ] `Authorization: Bearer <key>` is accepted (OpenAI-compatible SDKs, Claude Code gateway mode).
 - [ ] `X-Api-Key: <key>` is accepted where Anthropic-style clients need it.
 - [ ] A revoked key stops authenticating after the normal watch propagation delay.
