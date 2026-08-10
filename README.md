@@ -463,3 +463,11 @@ Before pointing colleagues at the portal, confirm against the kgateway release a
 
 Each of the five client setup snippets should be tested end to end. They are the part of this
 repository most likely to drift.
+
+## License
+
+[Apache License 2.0](LICENSE). Copyright 2026 David Birks.
+
+Apache-2.0 rather than MIT because this repository is employer-adjacent: it includes an explicit
+patent grant, and its contribution clause licenses any submitted change under the same terms
+without needing a separate CLA.
