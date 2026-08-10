@@ -1,7 +1,7 @@
 {{define "title"}}Create API key{{end}}
 
 {{define "main"}}
-<section class="section narrow">
+<div class="panel panel-pad panel-narrow">
   <h1>Create API key</h1>
 
   <form method="post" action="/keys" class="form">
@@ -21,16 +21,16 @@
       <p class="field-error" id="name-error"><strong>Error:</strong> {{.NameError}}</p>
       {{else}}
       <p class="field-help" id="name-help">
-        Use a name that helps you remember where the key is stored, like
-        “MacBook Claude Code”.
+        Use a name that helps you remember where the key is stored. Up to 64
+        characters.
       </p>
       {{end}}
     </div>
 
     <div class="form-actions">
-      <a class="button button-quiet" href="/account">Cancel</a>
+      <a class="button" href="/account">Cancel</a>
       <button type="submit" class="button button-primary">Create key</button>
     </div>
   </form>
-</section>
+</div>
 {{end}}

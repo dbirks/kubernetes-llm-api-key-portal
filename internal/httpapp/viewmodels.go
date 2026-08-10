@@ -33,10 +33,20 @@ type Page struct {
 	// DevMode is true when the development login bypass is active. Templates
 	// must render a conspicuous banner when it is set.
 	DevMode bool
+
+	// ActiveNav names the navigation item base.html marks as current. It is
+	// "keys", "howitworks", or "" when there is nothing to highlight, which is
+	// the case for the signed-out and error pages.
+	ActiveNav string
 }
 
 // LandingPage backs the signed-out landing page.
 type LandingPage struct {
+	Page
+}
+
+// HowItWorksPage backs the static explainer at GET /how-it-works.
+type HowItWorksPage struct {
 	Page
 }
 
@@ -59,6 +69,10 @@ type AccountPage struct {
 	// EnvVar is the environment variable name the guides use, so the page can
 	// mention it outside a code block.
 	EnvVar string
+
+	// SelectedKeyID is the key whose detail pane is rendered. Selection is
+	// resolved server-side so the page works without JavaScript.
+	SelectedKeyID string
 }
 
 // NewKeyPage backs the create-key form. NameError is set when a submission was

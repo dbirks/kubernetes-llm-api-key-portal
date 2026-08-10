@@ -2,64 +2,104 @@
 {{/*
   Client setup instructions.
 
-  Rendered as a plain list of <details> so the page is fully usable without
-  JavaScript. app.js may upgrade this into a tab strip; if it does, it must keep
-  every panel reachable by keyboard and must not remove content from the DOM.
+  No-JS baseline first: the tab strip is `hidden`, every guide is a <details>
+  with its own <summary>, and every command block is visible with a heading
+  naming its shell. app.js then removes `hidden`, marks the container
+  `data-enhanced`, hides the now-redundant summaries and switches panels. It
+  never removes content from the DOM, so in-page search and printing still work.
 
-  Copy buttons are wired by id pairs only. A snippet may contain the credential,
-  so its text lives in the <pre> body and never in an attribute.
+  Snippet text always comes from internal/onboarding via .Guides — never
+  hard-coded here. Copy buttons address a snippet by the id of its <pre>, so a
+  snippet that contains the credential keeps it in element body text only.
 */}}
 <div class="guides" data-guides>
-  <ul class="guide-tabs" role="list" data-guide-tabs hidden>
-    {{range .Guides}}
-    <li><button type="button" class="guide-tab" data-guide-target="guide-{{.ID}}">{{.Name}}</button></li>
-    {{end}}
-  </ul>
+  <div class="guides-bar">
+    <ul class="segmented" data-guide-tabs hidden>
+      {{range .Guides}}
+      <li><button type="button" class="guide-tab" data-guide-target="guide-{{.ID}}">{{.Name}}</button></li>
+      {{end}}
+    </ul>
+  </div>
 
-  {{range .Guides}}
-  {{$guide := .}}
-  <details class="guide" id="guide-{{.ID}}" data-guide-panel>
+  {{/* The first panel starts open so the page is useful without JavaScript;
+       app.js reopens whichever one the tab strip selects. */}}
+  {{range $index, $guide := .Guides}}
+  <details class="guide" id="guide-{{.ID}}" data-guide-panel{{if eq $index 0}} open{{end}}>
     <summary class="guide-summary">{{.Name}}</summary>
 
-    <p class="guide-description">{{.Description}}</p>
+    <div class="guide-body">
+      <p class="guide-description">{{.Description}}</p>
 
-    {{range $i, $file := .Files}}
-    <figure class="snippet">
-      <figcaption>
-        <code class="snippet-path">{{$file.Path}}</code>
-        <button type="button" class="button button-quiet copy-button" data-copy-target="{{$guide.ID}}-file-{{$i}}">Copy</button>
-      </figcaption>
-      <pre class="snippet-body" id="{{$guide.ID}}-file-{{$i}}"><code>{{$file.Content}}</code></pre>
-    </figure>
-    {{end}}
+      {{/*
+        The shell toggle only makes sense when a guide ships more than one
+        command block. With a single block there is nothing to choose between,
+        so the strip is left out entirely rather than rendered as a dead
+        control.
+      */}}
+      {{if gt (len .Commands) 1}}
+      <div class="guides-bar">
+        <span></span>
+        <ul class="shell-toggle" data-shell-tabs hidden>
+          {{range $i, $block := .Commands}}
+          <li>
+            <button type="button" class="shell-tab"
+                    data-shell-target="{{$guide.ID}}-cmd-{{$i}}"
+                    data-shell-lang="{{$block.Language}}">{{$block.Language}}</button>
+          </li>
+          {{end}}
+        </ul>
+      </div>
+      {{end}}
 
-    {{range $i, $block := .Commands}}
-    <figure class="snippet">
-      <figcaption>
-        <span class="snippet-path">Shell</span>
-        <button type="button" class="button button-quiet copy-button" data-copy-target="{{$guide.ID}}-cmd-{{$i}}">Copy</button>
-      </figcaption>
-      <pre class="snippet-body" id="{{$guide.ID}}-cmd-{{$i}}"><code>{{$block.Content}}</code></pre>
-    </figure>
-    {{end}}
-
-    {{if .Notes}}
-    <ul class="guide-notes">
-      {{range .Notes}}<li>{{.}}</li>{{end}}
-    </ul>
-    {{end}}
-
-    <details class="agent-prompt">
-      <summary>Let another coding agent set this up</summary>
-      <p class="guide-description">Paste this into a coding agent already running on your machine.</p>
+      {{range $i, $file := .Files}}
       <figure class="snippet">
         <figcaption>
-          <span class="snippet-path">Prompt</span>
-          <button type="button" class="button button-quiet copy-button" data-copy-target="{{$guide.ID}}-prompt">Copy</button>
+          <code class="snippet-path">{{$file.Path}}</code>
+          <span class="snippet-actions">
+            <button type="button" class="button button-outline button-small copy-button"
+                    data-copy-target="{{$guide.ID}}-file-{{$i}}">Copy file</button>
+          </span>
         </figcaption>
-        <pre class="snippet-body" id="{{$guide.ID}}-prompt"><code>{{$guide.AgentPrompt}}</code></pre>
+        <pre class="snippet-body" id="{{$guide.ID}}-file-{{$i}}"><code>{{$file.Content}}</code></pre>
       </figure>
-    </details>
+      {{end}}
+
+      {{range $i, $block := .Commands}}
+      <figure class="snippet" data-shell-panel id="{{$guide.ID}}-cmd-{{$i}}-panel">
+        <figcaption>
+          <span class="snippet-path">{{$block.Language}}</span>
+          <span class="snippet-actions">
+            <button type="button" class="button button-primary button-small copy-button"
+                    data-copy-target="{{$guide.ID}}-cmd-{{$i}}">Copy setup</button>
+            <button type="button" class="button button-outline button-small copy-button"
+                    data-copy-target="{{$guide.ID}}-prompt">Copy instructions for my agent</button>
+          </span>
+        </figcaption>
+        <pre class="snippet-body" id="{{$guide.ID}}-cmd-{{$i}}"><code>{{$block.Content}}</code></pre>
+      </figure>
+      {{end}}
+
+      {{if .Notes}}
+      <ul class="guide-notes">
+        {{range .Notes}}<li>{{.}}</li>{{end}}
+      </ul>
+      {{end}}
+
+      <details class="agent-prompt">
+        <summary>Let another coding agent set this up</summary>
+        <p class="guide-description">Paste this into a coding agent already running on your machine.</p>
+        <figure class="snippet">
+          <figcaption>
+            <span class="snippet-path">Prompt</span>
+            <span class="snippet-actions">
+              <button type="button" class="button button-outline button-small copy-button"
+                      data-copy-target="{{$guide.ID}}-prompt">Copy</button>
+            </span>
+          </figcaption>
+          <pre class="snippet-body" id="{{$guide.ID}}-prompt"><code>{{$guide.AgentPrompt}}</code></pre>
+        </figure>
+      </details>
+    </div>
   </details>
   {{end}}
 </div>

@@ -1,42 +1,70 @@
-{{define "title"}}Account{{end}}
+{{define "title"}}Keys{{end}}
 
 {{define "main"}}
-<section class="section">
-  <div class="section-head">
-    <h1>API keys</h1>
-    <a class="button button-primary" href="/keys/new">Create API key</a>
-  </div>
-
+{{$sel := .SelectedKeyID}}
+<div class="panel">
   {{if .Keys}}
-  <ul class="key-list" role="list">
-    {{range .Keys}}
-    <li class="key">
-      <div class="key-detail">
-        <h2 class="key-name">{{.Name}}</h2>
-        <p class="key-meta">
-          Created <time datetime="{{datetime .CreatedAt}}">{{date .CreatedAt}}</time>
-          · Ends in <code>…{{.Suffix}}</code>
-        </p>
+  <div class="keys">
+
+    {{/*
+      Key selection is a plain link per key, resolved server-side from
+      ?key={id}. No JavaScript is involved, so the rail works in every browser.
+    */}}
+    <div class="rail">
+      <div class="rail-head">
+        <h1 class="eyebrow">Keys</h1>
+        <span class="rail-count">{{len .Keys}}</span>
       </div>
-      <a class="button button-quiet" href="/keys/{{.ID}}/revoke">Revoke</a>
-    </li>
-    {{end}}
-  </ul>
+
+      <ul class="rail-list" role="list">
+        {{range .Keys}}
+        <li>
+          <a class="rail-item" href="/account?key={{.ID}}"
+             {{if eq .ID $sel}}aria-current="true"{{end}}>
+            <span class="rail-name">{{.Name}}</span>
+            <span class="rail-suffix">…{{.Suffix}}</span>
+          </a>
+        </li>
+        {{end}}
+      </ul>
+
+      <a class="button button-primary rail-create" href="/keys/new">Create API key</a>
+    </div>
+
+    <div class="detail">
+      {{range .Keys}}
+      {{if eq .ID $sel}}
+      <div class="detail-head">
+        <div class="detail-headings">
+          <h2>{{.Name}}</h2>
+          <div class="detail-meta">
+            <span class="pill"><span class="pill-dot" aria-hidden="true"></span>active</span>
+            <span class="detail-meta-text">…{{.Suffix}} · created
+              <time datetime="{{datetime .CreatedAt}}">{{date .CreatedAt}}</time>
+            </span>
+          </div>
+        </div>
+        <a class="button button-revoke" href="/keys/{{.ID}}/revoke">Revoke</a>
+      </div>
+      {{end}}
+      {{end}}
+
+      <h3 class="visually-hidden">Connect a coding agent</h3>
+      {{template "guides.html" .}}
+
+      <p class="fine-print">
+        Every guide reads the key from the <code>{{.EnvVar}}</code> environment
+        variable, so it never has to be written into a file you might commit.
+      </p>
+    </div>
+
+  </div>
   {{else}}
-  <div class="empty">
-    <p>You do not have an API key yet.</p>
-    <p>Create one to connect a coding agent.</p>
+  <div class="empty-state">
+    <h1 class="empty-title">You do not have an API key yet.</h1>
+    <p class="empty-body">Create one to connect a coding agent.</p>
     <a class="button button-primary" href="/keys/new">Create API key</a>
   </div>
   {{end}}
-</section>
-
-<section class="section">
-  <h2>Connect a coding agent</h2>
-  <p>
-    Each guide reads the key from the <code>{{.EnvVar}}</code> environment variable,
-    so it never has to be written into a file you might commit.
-  </p>
-  {{template "guides.html" .}}
-</section>
+</div>
 {{end}}

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log/slog"
+	"mime"
 	"net/http"
 
 	"github.com/dbirks/kubernetes-llm-api-key-portal/internal/auth"
@@ -108,6 +109,7 @@ func (a *App) routes() http.Handler {
 	mux.Handle("GET /static/", a.staticHandler())
 
 	mux.HandleFunc("GET /{$}", a.handleLanding)
+	mux.HandleFunc("GET /how-it-works", a.handleHowItWorks)
 	mux.HandleFunc("GET /login", a.handleLogin)
 	mux.HandleFunc("GET /auth/callback", a.handleCallback)
 
@@ -153,6 +155,15 @@ func (a *App) staticHandler() http.Handler {
 		// directory is missing entirely, which is a build-time mistake.
 		panic("httpapp: static assets unavailable: " + err.Error())
 	}
+	// Go's built-in extension table has no .woff2 entry, and the distroless
+	// runtime image has no /etc/mime.types for it to fall back to, so the
+	// vendored fonts would be served as sniffed application/octet-stream in
+	// the container while looking correct on any developer machine.
+	// Registering it here makes the two environments agree.
+	if err := mime.AddExtensionType(".woff2", "font/woff2"); err != nil {
+		panic("httpapp: registering the woff2 media type: " + err.Error())
+	}
+
 	fileServer := http.FileServer(http.FS(sub))
 	return http.StripPrefix("/static/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// These are versioned by deployment rather than by content hash, so

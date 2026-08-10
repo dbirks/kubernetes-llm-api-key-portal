@@ -1,39 +1,42 @@
 {{define "title"}}API key created{{end}}
 
 {{define "main"}}
-<section class="section narrow">
-  <h1>API key created</h1>
-  <p class="key-name">{{.KeyName}}</p>
+<div class="panel panel-accent panel-pad">
+  <div class="created-head">
+    <div>
+      <h1>API key created</h1>
+      <p class="created-name">{{.KeyName}}</p>
+    </div>
+    <span class="pill pill-accent">Shown once</span>
+  </div>
 
   {{/*
     The only place in the application where a credential is rendered. It lives
-    in the element body, never in an attribute, id, or URL.
+    in the element body, never in an attribute, an id, a data-* value, or a URL.
+    The copy button addresses the <pre> by a fixed id instead.
   */}}
-  <figure class="snippet snippet-secret">
-    <figcaption>
-      <span class="snippet-path">Your API key</span>
-      <button type="button" class="button button-primary copy-button" data-copy-target="new-key">Copy key</button>
-    </figcaption>
-    <pre class="snippet-body" id="new-key"><code>{{.Secret}}</code></pre>
+  <figure class="secret">
+    <pre class="secret-value" id="new-key"><code>{{.Secret}}</code></pre>
+    <button type="button" class="button button-primary copy-button" data-copy-target="new-key">Copy key</button>
   </figure>
 
-  <div class="callout callout-warning" role="note">
-    <p><strong>Save this key now. It will not be shown again.</strong></p>
-    <p>If you lose it, create a replacement and revoke this one.</p>
+  <p class="created-warning">
+    Save this key now. It will not be shown here again. If you lose it, create a
+    replacement and revoke this key.
+  </p>
+
+  <div class="created-guides">
+    <span class="eyebrow">Quick start · snippets here come pre-filled with this key</span>
+    {{template "guides.html" .}}
+
+    <p class="fine-print">
+      The snippets set <code>{{.EnvVar}}</code> so the key stays in your
+      environment rather than in a file you might commit.
+    </p>
   </div>
-</section>
 
-<section class="section">
-  <h2>Quick start</h2>
-  <p>
-    These snippets already contain your new key. They set
-    <code>{{.EnvVar}}</code> so the key stays in your environment rather than in
-    a file you might commit.
-  </p>
-  {{template "guides.html" .}}
-
-  <p class="form-actions">
-    <a class="button button-quiet" href="/account">Done</a>
-  </p>
-</section>
+  <div class="form-actions">
+    <a class="button" href="/account">Done</a>
+  </div>
+</div>
 {{end}}

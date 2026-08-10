@@ -1,24 +1,19 @@
 {{define "title"}}Revoke API key{{end}}
 
 {{define "main"}}
-<section class="section narrow">
+<div class="panel panel-pad panel-narrow">
   <h1>Revoke “{{.Key.Name}}”?</h1>
 
-  <div class="callout callout-warning" role="note">
-    <p>Anything using this key will stop authenticating immediately.</p>
-    <p>This cannot be undone. Create a replacement key first if you need one.</p>
-  </div>
-
-  <p class="key-meta">
-    Created <time datetime="{{datetime .Key.CreatedAt}}">{{date .Key.CreatedAt}}</time>
-    · Ends in <code>…{{.Key.Suffix}}</code>
+  <p class="error-message">
+    Anything using this key will stop authenticating. This cannot be undone —
+    you would need to create a new key.
   </p>
 
   {{/* The key ID comes from the URL, not a hidden field: ownership is checked
        server-side against the session, never against form input. */}}
   <form method="post" action="/keys/{{.Key.ID}}/revoke" class="form-actions">
-    <a class="button button-quiet" href="/account">Cancel</a>
+    <a class="button" href="/account">Cancel</a>
     <button type="submit" class="button button-danger">Revoke key</button>
   </form>
-</section>
+</div>
 {{end}}

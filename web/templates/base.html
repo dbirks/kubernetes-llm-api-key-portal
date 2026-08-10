@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+{{/* Dark-only design. Declared here as well as in app.css so the browser
+     paints the right canvas before the stylesheet arrives. */}}
+<meta name="color-scheme" content="dark">
 <meta name="robots" content="noindex, nofollow">
 <title>{{block "title" .}}{{.Title}}{{end}} · {{.Brand.Name}}</title>
 {{/* The generated brand sheet must come first: app.css consumes its custom
@@ -12,32 +15,62 @@
 {{if .Brand.FaviconURL}}<link rel="icon" href="{{.Brand.FaviconURL}}">{{end}}
 </head>
 <body>
+<a class="skip-link" href="#main">Skip to main content</a>
+
 {{if .DevMode}}
 <p class="dev-banner" role="alert">
-  Development mode — sign-in is bypassed and no real identity is checked. Never expose this deployment.
+  <span class="dev-chip">Dev</span>
+  <span>Authentication is bypassed. This build must never be exposed publicly.</span>
 </p>
 {{end}}
 
-<a class="skip-link" href="#main">Skip to main content</a>
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="topbar-left">
+      <a class="brand" href="/">
+        {{if .Brand.HasLogo}}
+          <img class="brand-logo" src="{{.Brand.LogoURL}}" alt="{{.Brand.LogoAlt}}" height="20">
+        {{else}}
+          <span class="brand-wordmark">{{.Brand.ShortName}}</span>
+        {{end}}
+      </a>
 
-<header class="site-header">
-  <a class="brand" href="/">
-    {{if .Brand.HasLogo}}
-      <img class="brand-logo" src="{{.Brand.LogoURL}}" alt="{{.Brand.LogoAlt}}" height="28">
+      <nav class="nav" aria-label="Primary">
+        {{if .User}}
+        <a class="nav-link{{if eq .ActiveNav "keys"}} is-current{{end}}"
+           href="/account"{{if eq .ActiveNav "keys"}} aria-current="page"{{end}}>Keys</a>
+        {{end}}
+        <a class="nav-link{{if eq .ActiveNav "howitworks"}} is-current{{end}}"
+           href="/how-it-works"{{if eq .ActiveNav "howitworks"}} aria-current="page"{{end}}>How it works</a>
+      </nav>
+    </div>
+
+    {{if .User}}
+    {{/*
+      A <details> disclosure rather than a scripted popup, so the menu opens and
+      Sign out submits with JavaScript disabled. app.js only adds
+      click-outside-to-close and Escape.
+    */}}
+    <details class="usermenu" data-usermenu>
+      <summary class="usermenu-trigger">
+        <span class="avatar" aria-hidden="true">{{.User.Initials}}</span>
+        <span class="usermenu-name">{{.User.Name}}</span>
+        <span class="usermenu-caret" aria-hidden="true">▾</span>
+      </summary>
+      <div class="usermenu-panel">
+        <p class="usermenu-id">
+          <span class="usermenu-id-name">{{.User.Name}}</span>
+          {{if .User.Email}}<span class="usermenu-id-email">{{.User.Email}}</span>{{end}}
+        </p>
+        <form method="post" action="/logout">
+          <button type="submit" class="button button-block">Sign out</button>
+        </form>
+      </div>
+    </details>
     {{else}}
-      <span class="brand-wordmark">{{.Brand.Name}}</span>
+    <a class="nav-signin" href="/login">Sign in</a>
     {{end}}
-  </a>
-
-  {{if .User}}
-  <div class="account-chip">
-    <span class="account-name">{{.User.Name}}</span>
-    {{if .User.Email}}<span class="account-email">{{.User.Email}}</span>{{end}}
-    <form method="post" action="/logout">
-      <button type="submit" class="button button-quiet">Sign out</button>
-    </form>
   </div>
-  {{end}}
 </header>
 
 {{template "flashes.html" .}}
@@ -47,12 +80,14 @@
 </main>
 
 <footer class="site-footer">
-  <p>{{.Brand.Tagline}}</p>
-  <p class="footer-meta">
-    {{if .Brand.SupportURL}}<a href="{{.Brand.SupportURL}}">Get help</a>
-    {{else if .Brand.SupportEmail}}<a href="mailto:{{.Brand.SupportEmail}}">Get help</a>{{end}}
-    {{if .RequestID}}<span class="request-id">Request {{.RequestID}}</span>{{end}}
-  </p>
+  <div class="site-footer-inner">
+    <p>{{.Brand.Tagline}}</p>
+    <p class="footer-meta">
+      {{if .Brand.SupportURL}}<a href="{{.Brand.SupportURL}}">Get help</a>
+      {{else if .Brand.SupportEmail}}<a href="mailto:{{.Brand.SupportEmail}}">Get help</a>{{end}}
+      {{if .RequestID}}<span>Request {{.RequestID}}</span>{{end}}
+    </p>
+  </div>
 </footer>
 
 <script src="/static/app.js" defer></script>

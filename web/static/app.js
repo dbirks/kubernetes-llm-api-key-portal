@@ -1,25 +1,61 @@
 /*
  * Progressive enhancement only.
  *
- * Every flow on this site works with JavaScript disabled. This file adds two
- * conveniences and nothing else:
+ * Every flow on this site works with JavaScript disabled:
  *
- *   1. Clipboard buttons for snippets.
- *   2. A tab strip over the guide list, which is plain <details> without JS.
+ *   - Key selection is a link per key, resolved server-side from ?key={id}.
+ *   - Client guides are <details> panels, all present and all openable.
+ *   - Multi-shell command blocks are stacked, each headed by its shell name.
+ *   - The user menu is a <details> disclosure wrapping a real POST form.
+ *   - Copy buttons are hidden by CSS until this file marks the document.
  *
- * There is no inline script anywhere, which is what lets the CSP stay at
- * script-src 'self' with no nonce.
+ * This file adds convenience on top of that and nothing else. There is no
+ * inline script anywhere, which is what lets the CSP stay at script-src 'self'
+ * with no nonce, and no fetch() — every state change is a form POST.
  */
 (function () {
   "use strict";
 
-  /* ---- copy buttons ---- */
+  var root = document.documentElement;
 
-  function textFor(button) {
+  // Reveals the copy buttons. Anything gated on this must be a convenience,
+  // never the only route to a piece of functionality.
+  root.setAttribute("data-js", "");
+
+  // The copy buttons announce their own result by swapping their label, so the
+  // live region has to be in place before the first click.
+  document.querySelectorAll(".copy-button").forEach(function (button) {
+    button.setAttribute("aria-live", "polite");
+  });
+
+  /* ---- preferences ------------------------------------------------------ */
+
+  // Neither of these is security-relevant: one remembers which client tab you
+  // were reading, the other which shell you use.
+  var CLIENT_KEY = "portal.client";
+  var SHELL_KEY = "portal.shell";
+
+  function readPref(name) {
+    try {
+      return window.localStorage.getItem(name);
+    } catch (e) {
+      return null; // storage disabled or partitioned; fall back to defaults
+    }
+  }
+
+  function writePref(name, value) {
+    try {
+      window.localStorage.setItem(name, value);
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  /* ---- copy buttons ----------------------------------------------------- */
+
+  function sourceFor(button) {
     var id = button.getAttribute("data-copy-target");
-    if (!id) return null;
-    var source = document.getElementById(id);
-    return source ? source.innerText : null;
+    return id ? document.getElementById(id) : null;
   }
 
   function flash(button, message) {
@@ -33,12 +69,17 @@
     window.setTimeout(function () {
       button.textContent = original;
       button.removeAttribute("data-copied");
-    }, 2000);
+    }, 1400);
   }
 
   function copy(button) {
-    var text = textFor(button);
-    if (text === null) return;
+    var source = sourceFor(button);
+    if (!source) return;
+
+    // innerText on an element that is not being rendered falls back to
+    // textContent, so a snippet inside a closed <details> still copies.
+    var text = source.innerText;
+    if (!text) return;
 
     // navigator.clipboard requires a secure context, which excludes plain-http
     // development. Fall back to a selection-based copy there.
@@ -49,8 +90,7 @@
       );
       return;
     }
-    var source = document.getElementById(button.getAttribute("data-copy-target"));
-    if (!source) return;
+
     var range = document.createRange();
     range.selectNodeContents(source);
     var selection = window.getSelection();
@@ -64,7 +104,7 @@
     if (button) copy(button);
   });
 
-  /* ---- guide tabs ---- */
+  /* ---- client guide tabs ------------------------------------------------ */
 
   // Upgrades the <details> list into a tab strip. Panels are never removed from
   // the DOM, only closed, so in-page search and printing still find them.
@@ -84,8 +124,9 @@
       tab.setAttribute("role", "tab");
       tab.parentElement.setAttribute("role", "presentation");
     });
+    container.setAttribute("data-enhanced", "");
 
-    function select(id) {
+    function select(id, remember) {
       panels.forEach(function (panel) {
         panel.open = panel.id === id;
       });
@@ -95,11 +136,12 @@
         // Roving tabindex: one stop for the strip, arrow keys move within it.
         tab.tabIndex = active ? 0 : -1;
       });
+      if (remember) writePref(CLIENT_KEY, id);
     }
 
     tabList.addEventListener("click", function (event) {
       var tab = event.target.closest(".guide-tab");
-      if (tab) select(tab.getAttribute("data-guide-target"));
+      if (tab) select(tab.getAttribute("data-guide-target"), true);
     });
 
     tabList.addEventListener("keydown", function (event) {
@@ -113,9 +155,85 @@
       if (next === null) return;
       event.preventDefault();
       tabs[next].focus();
-      select(tabs[next].getAttribute("data-guide-target"));
+      select(tabs[next].getAttribute("data-guide-target"), true);
     });
 
-    select(panels[0].id);
+    var remembered = readPref(CLIENT_KEY);
+    var known = panels.some(function (panel) { return panel.id === remembered; });
+    select(known ? remembered : panels[0].id, false);
+  });
+
+  /* ---- shell toggle ----------------------------------------------------- */
+
+  // Rendered only when a guide ships more than one command block. Without this
+  // upgrade the blocks are simply stacked, each under its own shell heading.
+  function looksLikePowerShell(name) {
+    return /power ?shell|pwsh|ps1/i.test(name || "");
+  }
+
+  var prefersPowerShell = /Windows/i.test(navigator.userAgent || "");
+
+  document.querySelectorAll("[data-shell-tabs]").forEach(function (tabList) {
+    var tabs = Array.prototype.slice.call(tabList.querySelectorAll(".shell-tab"));
+    if (tabs.length < 2) return;
+
+    var panels = tabs
+      .map(function (tab) {
+        return document.getElementById(tab.getAttribute("data-shell-target") + "-panel");
+      })
+      .filter(Boolean);
+    if (panels.length !== tabs.length) return;
+
+    tabList.hidden = false;
+    tabList.setAttribute("role", "tablist");
+    tabs.forEach(function (tab) {
+      tab.setAttribute("role", "tab");
+      tab.parentElement.setAttribute("role", "presentation");
+    });
+
+    function select(lang, remember) {
+      tabs.forEach(function (tab, i) {
+        var active = tab.getAttribute("data-shell-lang") === lang;
+        tab.setAttribute("aria-selected", active ? "true" : "false");
+        tab.tabIndex = active ? 0 : -1;
+        panels[i].hidden = !active;
+      });
+      if (remember) writePref(SHELL_KEY, lang);
+    }
+
+    function langs() {
+      return tabs.map(function (tab) { return tab.getAttribute("data-shell-lang"); });
+    }
+
+    tabList.addEventListener("click", function (event) {
+      var tab = event.target.closest(".shell-tab");
+      if (tab) select(tab.getAttribute("data-shell-lang"), true);
+    });
+
+    var available = langs();
+    var remembered = readPref(SHELL_KEY);
+    var initial = available.indexOf(remembered) >= 0 ? remembered : null;
+    if (initial === null && prefersPowerShell) {
+      available.forEach(function (lang) {
+        if (initial === null && looksLikePowerShell(lang)) initial = lang;
+      });
+    }
+    select(initial === null ? available[0] : initial, false);
+  });
+
+  /* ---- user menu -------------------------------------------------------- */
+
+  // The menu is a <details>, so it already opens and closes without this. All
+  // that is added here is dismissing it the way a menu is expected to dismiss.
+  document.querySelectorAll("[data-usermenu]").forEach(function (menu) {
+    document.addEventListener("click", function (event) {
+      if (menu.open && !menu.contains(event.target)) menu.open = false;
+    });
+    menu.addEventListener("keydown", function (event) {
+      if (event.key !== "Escape" || !menu.open) return;
+      menu.open = false;
+      var trigger = menu.querySelector("summary");
+      if (trigger) trigger.focus();
+    });
   });
 })();

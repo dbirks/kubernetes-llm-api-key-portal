@@ -283,7 +283,7 @@ func TestBrandDefaults(t *testing.T) {
 		t.Fatalf("Load: %v", err)
 	}
 	// The default is this deployment's own identity, not a generic placeholder.
-	if cfg.Brand.Name != "Birks AI" {
+	if cfg.Brand.Name != "llm.birks.dev" {
 		t.Errorf("Brand.Name = %q, want the built-in default", cfg.Brand.Name)
 	}
 	// ShortName and LogoAlt fall back to the name so templates never render

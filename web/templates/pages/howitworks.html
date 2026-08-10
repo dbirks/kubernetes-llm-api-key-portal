@@ -1,0 +1,117 @@
+{{define "title"}}How it works{{end}}
+
+{{define "main"}}
+<div class="panel hiw">
+  <h1 class="hiw-title">How it works</h1>
+
+  <p class="hiw-lede">
+    Two things happen here, and only one of them involves this portal. Your
+    prompts never pass through it.
+  </p>
+
+  {{/*
+    The connectors are decorative: every node carries its own text, so the
+    diagram reads correctly with animation off, with CSS off, and to a screen
+    reader. The two lanes run at different tempos on purpose — getting a key
+    happens once, using it happens on every request.
+  */}}
+  <section class="lane">
+    <div class="lane-head">
+      <h2 class="lane-title">Getting a key</h2>
+      <span class="lane-badge">once</span>
+    </div>
+    <div class="lane-scroll">
+      <div class="lane-grid lane-grid-slow">
+        <div class="node">
+          <span class="node-name">You, in a browser</span>
+          <span class="node-sub">{{.Brand.ShortName}}</span>
+        </div>
+        <div class="conn">
+          <span class="conn-line" aria-hidden="true"></span>
+          <span class="conn-label">sign in</span>
+        </div>
+        <div class="node">
+          <span class="node-name">Microsoft Entra ID</span>
+          <span class="node-sub">your work account</span>
+        </div>
+        <div class="conn">
+          <span class="conn-line" aria-hidden="true"></span>
+          <span class="conn-label">create key</span>
+        </div>
+        <div class="node node-strong">
+          <span class="node-name">This portal</span>
+          <span class="node-sub">shows the key once</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="hinge hinge-down">
+    <span class="hinge-line" aria-hidden="true"></span>
+    <span class="hinge-label">the portal writes one immutable Secret</span>
+  </div>
+
+  <div class="hinge">
+    <div class="hinge-box">
+      <span class="hinge-box-title">Kubernetes Secret</span>
+      <span class="hinge-box-sub">one per key · immutable</span>
+    </div>
+  </div>
+
+  <div class="hinge hinge-up">
+    <span class="hinge-label">kgateway matches your key against it</span>
+    <span class="hinge-line hinge-line-fast" aria-hidden="true"></span>
+  </div>
+
+  <section class="lane lane-fast">
+    <div class="lane-head">
+      <h2 class="lane-title">Using the key</h2>
+      <span class="lane-badge">every request</span>
+    </div>
+    <div class="lane-scroll">
+      <div class="lane-grid lane-grid-fast">
+        <div class="node node-accent">
+          <span class="node-name">Your coding agent</span>
+          <span class="node-sub">Bearer &lt;key&gt;</span>
+        </div>
+        <div class="conn"><span class="conn-line" aria-hidden="true"></span></div>
+        <div class="node node-accent">
+          <span class="node-name node-mono">/v1/*</span>
+          <span class="node-sub">public endpoint</span>
+        </div>
+        <div class="conn"><span class="conn-line" aria-hidden="true"></span></div>
+        <div class="node node-gate">
+          <span class="node-name">kgateway</span>
+          <span class="node-sub">checks the key</span>
+        </div>
+        <div class="conn"><span class="conn-line" aria-hidden="true"></span></div>
+        <div class="node node-accent">
+          <span class="node-name">vLLM</span>
+          <span class="node-sub">runs the request</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="hiw-foot">
+    <section class="hiw-card">
+      <h2 class="hiw-card-head eyebrow">Endpoints your key opens</h2>
+      <div class="hiw-card-body">
+        <p class="route"><span class="route-method">GET</span><span class="route-path">/v1/models</span></p>
+        <p class="route"><span class="route-method">POST</span><span class="route-path">/v1/chat/completions</span></p>
+        <p class="route"><span class="route-method">POST</span><span class="route-path">/v1/responses</span></p>
+        <p class="route"><span class="route-method">POST</span><span class="route-path">/v1/messages</span></p>
+      </div>
+    </section>
+
+    <section class="hiw-card hiw-card-pad">
+      <h2 class="eyebrow">Worth knowing</h2>
+      <ul class="hiw-list">
+        <li>Revoking deletes the Secret, so the key stops at kgateway.</li>
+        <li>The same key works for every supported client.</li>
+        <li>Nothing you prompt is stored by this portal.</li>
+      </ul>
+    </section>
+  </div>
+</div>
+{{end}}

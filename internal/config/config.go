@@ -71,9 +71,9 @@ const (
 	defaultPort         = 8080
 	defaultLogLevel     = "info"
 	defaultAPIKeyPrefix = "llm_"
-	defaultBrandName    = "Birks AI"
+	defaultBrandName    = "llm.birks.dev"
 	defaultBrandTagline = "Private self-hosted AI endpoint"
-	defaultBrandAccent  = "#4f46e5"
+	defaultBrandAccent  = "#3b6fd6"
 
 	minSessionKeyBytes = 32
 )
@@ -116,6 +116,16 @@ func Load() (*Config, error) {
 			SupportURL:   strings.TrimSpace(os.Getenv("BRAND_SUPPORT_URL")),
 		},
 	}
+	// The dark derivation in internal/brand lightens an accent until it clears
+	// AA against the page surface, which is the right guard for an accent used
+	// as text. Ours is only ever a button fill (4.74:1 with white), a 2px nav
+	// underline, and a focus ring — non-text, where the floor is 3:1. So for
+	// our own default, skip the derivation and ship the designed value. An
+	// operator who sets BRAND_ACCENT still gets the protection.
+	if os.Getenv("BRAND_ACCENT") == "" && cfg.Brand.AccentDark == "" {
+		cfg.Brand.AccentDark = defaultBrandAccent
+	}
+
 	if cfg.Brand.ShortName == "" {
 		cfg.Brand.ShortName = cfg.Brand.Name
 	}

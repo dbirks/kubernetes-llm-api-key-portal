@@ -35,11 +35,11 @@ func newHarness(t *testing.T) *testHarness {
 	log := slog.New(slog.NewJSONHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	brandData, err := brand.Resolve(config.BrandConfig{
-		Name:      "Birks AI",
-		ShortName: "Birks AI",
+		Name:      "llm.birks.dev",
+		ShortName: "llm.birks.dev",
 		Tagline:   "Private self-hosted AI endpoint",
-		LogoAlt:   "Birks AI",
-		Accent:    "#4f46e5",
+		LogoAlt:   "llm.birks.dev",
+		Accent:    "#3b6fd6",
 	}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatalf("brand.Resolve: %v", err)
@@ -61,9 +61,9 @@ func newHarness(t *testing.T) *testHarness {
 		Auth:   auth.NewFakeAuthenticator(sealer, auth.FakeUser),
 		Assets: web.Assets(),
 		Onboarding: onboarding.Params{
-			BaseURL:   "https://ai.birks.dev",
+			BaseURL:   "https://llm.birks.dev",
 			Model:     "Qwen3-Coder-30B",
-			BrandName: "Birks AI",
+			BrandName: "llm.birks.dev",
 		},
 	})
 	if err != nil {
@@ -141,7 +141,7 @@ func TestLandingPage(t *testing.T) {
 	if !strings.Contains(body, "Sign in with Microsoft") {
 		t.Error("landing page is missing the Microsoft sign-in button")
 	}
-	if !strings.Contains(body, "Birks AI") {
+	if !strings.Contains(body, "llm.birks.dev") {
 		t.Error("landing page does not show the configured brand name")
 	}
 }
@@ -155,6 +155,27 @@ func TestLandingRedirectsWhenSignedIn(t *testing.T) {
 	}
 	if got := rec.Header().Get("Location"); got != "/account" {
 		t.Errorf("Location = %q, want /account", got)
+	}
+}
+
+// The explainer is static content, so it must render for a visitor deciding
+// whether to sign in as well as for someone already signed in.
+func TestHowItWorksIsPublic(t *testing.T) {
+	h := newHarness(t)
+
+	for _, tc := range []struct {
+		name    string
+		session *http.Cookie
+	}{
+		{name: "signed out"},
+		{name: "signed in", session: h.signIn(t, auth.FakeUser)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := h.do(t, httptest.NewRequest(http.MethodGet, "/how-it-works", nil), tc.session)
+			if rec.Code != http.StatusOK {
+				t.Errorf("GET /how-it-works %s = %d, want 200", tc.name, rec.Code)
+			}
+		})
 	}
 }
 
@@ -516,6 +537,80 @@ func TestAccountPageShowsKeysAndGuides(t *testing.T) {
 	// The account page reflects the session, so it must not be cached.
 	if cc := rec.Header().Get("Cache-Control"); !strings.Contains(cc, "no-store") {
 		t.Errorf("Cache-Control = %q, want no-store", cc)
+	}
+}
+
+// ?key= chooses which key's detail pane is rendered. It is a display
+// preference, so an id nobody owns and an id somebody else owns must both fall
+// back to the default silently: erroring on one and not the other would report
+// whether a key exists.
+func TestAccountKeySelectionFallsBackSilently(t *testing.T) {
+	h := newHarness(t)
+	session := h.signIn(t, auth.FakeUser)
+
+	older, err := h.store.CreateKey(t.Context(), testOwner(auth.FakeUser), "Older key")
+	if err != nil {
+		t.Fatalf("CreateKey: %v", err)
+	}
+	newer, err := h.store.CreateKey(t.Context(), testOwner(auth.FakeUser), "Newer key")
+	if err != nil {
+		t.Fatalf("CreateKey: %v", err)
+	}
+	foreign, err := h.store.CreateKey(t.Context(),
+		keystore.Owner{TenantID: "tenant-a", ObjectID: "oid-other"}, "Someone else's key")
+	if err != nil {
+		t.Fatalf("CreateKey: %v", err)
+	}
+
+	for _, tc := range []struct {
+		name string
+		key  string
+	}{
+		{name: "owned", key: newer.ID},
+		{name: "unknown", key: "no-such-key"},
+		{name: "another user's", key: foreign.ID},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := h.do(t, httptest.NewRequest(http.MethodGet, "/account?key="+url.QueryEscape(tc.key), nil), session)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("GET /account?key=%s = %d, want 200", tc.key, rec.Code)
+			}
+			body := rec.Body.String()
+			if strings.Contains(body, "Someone else's key") {
+				t.Error("the account page rendered another user's key")
+			}
+			// The user's own keys are all listed whichever one is selected.
+			for _, name := range []string{older.Name, newer.Name} {
+				if !strings.Contains(body, name) {
+					t.Errorf("%q is missing from the listing", name)
+				}
+			}
+		})
+	}
+}
+
+// selectedKey holds the selection rule the handler depends on, independent of
+// how the page happens to render it.
+func TestSelectedKey(t *testing.T) {
+	keys := []KeyView{{ID: "newest"}, {ID: "older"}}
+
+	tests := []struct {
+		name string
+		keys []KeyView
+		want string
+		req  string
+	}{
+		{name: "owned key is honoured", keys: keys, req: "older", want: "older"},
+		{name: "unknown id falls back to the first", keys: keys, req: "not-a-key", want: "newest"},
+		{name: "no request falls back to the first", keys: keys, req: "", want: "newest"},
+		{name: "no keys selects nothing", keys: nil, req: "older", want: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := selectedKey(tt.keys, tt.req); got != tt.want {
+				t.Errorf("selectedKey(%v, %q) = %q, want %q", tt.keys, tt.req, got, tt.want)
+			}
+		})
 	}
 }
 

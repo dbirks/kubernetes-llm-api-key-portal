@@ -6,7 +6,7 @@ work account, create an API key for a self-hosted LLM endpoint, and connect thei
 ## Read this first: it is opinionated
 
 This is not a general-purpose product. It is built for one specific deployment — a self-hosted
-vLLM endpoint at `ai.birks.dev`, running on a home Kubernetes cluster, used by colleagues at
+vLLM endpoint at `llm.birks.dev`, running on a home Kubernetes cluster, used by colleagues at
 [E-gineering](https://www.e-gineering.com) who sign in with their work Microsoft accounts.
 
 Those opinions are baked in rather than abstracted away:
@@ -20,6 +20,9 @@ Those opinions are baked in rather than abstracted away:
   selects on. `ai.birks.dev` is a compile-time constant in
   `internal/keystore/kubernetes`, not a setting — it is one half of a contract with the
   `TrafficPolicy` in the cluster repository, and the two must change together.
+  **The label prefix and the public hostname have diverged on purpose.** The site is served at
+  `llm.birks.dev`; the labels stay `ai.birks.dev`. Renaming the labels to match the hostname
+  would break every existing key, silently — see the Secret contract below.
 - **vLLM is the backend.** The five client setup guides assume the Anthropic Messages API,
   OpenAI-compatible endpoints, and the Responses API are all served from the same origin.
 - **Kubernetes Secrets are the database.** There is no SQL, no ORM, and no user table.
@@ -46,6 +49,8 @@ internals.
 - Creates a new key, shown exactly once.
 - Revokes a key.
 - Generates copy-paste setup instructions for Claude Code, Pi, OpenCode, Codex, and Crush.
+- Explains the moving parts at `GET /how-it-works`, which is public so it can be read before
+  signing in.
 
 ## What it deliberately does not do
 
@@ -173,7 +178,7 @@ service creates.
 
 ## Branding
 
-The defaults are this deployment's own identity — "Birks AI", indigo accent, no logo. The knobs
+The defaults are this deployment's own identity — "llm.birks.dev", blue accent, no logo. The knobs
 below exist so the portal does not look wrong when it is run somewhere else, and so a logo can be
 dropped in without a rebuild. In Kubernetes this is one ConfigMap for the strings and one mounted
 volume for the image files.
@@ -182,13 +187,13 @@ This is not a white-label product; it is one deployment with a few things left a
 
 | Variable | Default | Description |
 |---|---|---|
-| `BRAND_NAME` | `Birks AI` | Company or service name. Appears in the header, page title, and footer. |
+| `BRAND_NAME` | `llm.birks.dev` | Company or service name. Appears in the header, page title, and footer. |
 | `BRAND_SHORT_NAME` | = `BRAND_NAME` | Shorter form for tight layouts. |
 | `BRAND_TAGLINE` | `Private self-hosted AI endpoint` | One-line description on the landing page and footer. |
 | `BRAND_LOGO_FILE` | — | Path to a mounted PNG, JPEG, WebP, or SVG. Without one, a text wordmark is rendered. |
 | `BRAND_LOGO_ALT` | = `BRAND_NAME` | Alt text for the logo. |
 | `BRAND_FAVICON_FILE` | — | Path to a mounted icon. |
-| `BRAND_ACCENT` | `#4f46e5` | Accent colour, `#rgb` or `#rrggbb`. |
+| `BRAND_ACCENT` | `#3b6fd6` | Accent colour, `#rgb` or `#rrggbb`. |
 | `BRAND_ACCENT_DARK` | derived | Explicit dark-mode accent. Derived from `BRAND_ACCENT` when unset. |
 | `BRAND_SUPPORT_EMAIL` | — | Shown as a "Get help" link. |
 | `BRAND_SUPPORT_URL` | — | Takes precedence over the email if both are set. |
@@ -248,7 +253,7 @@ around it is yours.
 ### Example
 
 ```bash
-BRAND_NAME="Birks AI"
+BRAND_NAME="Acme AI"
 BRAND_TAGLINE="Private self-hosted AI for the team"
 BRAND_ACCENT="#0f766e"
 BRAND_LOGO_FILE=/etc/brand/logo.svg

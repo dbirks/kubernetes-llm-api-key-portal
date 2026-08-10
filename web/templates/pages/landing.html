@@ -1,19 +1,19 @@
 {{define "title"}}Sign in{{end}}
 
 {{define "main"}}
-<section class="landing">
+<div class="panel landing">
   <h1>{{.Brand.Name}}</h1>
-  <p class="lede">{{.Brand.Tagline}}</p>
+  <p class="landing-tagline">{{.Brand.Tagline}}</p>
 
-  <p>
+  <p class="landing-copy">
     Use your Microsoft work account to create an API key and connect
     Claude Code, Pi, OpenCode, Codex, or Crush.
   </p>
 
   {{template "ms_button.html" .}}
 
-  <p class="fine-print">
-    Inference runs on self-hosted hardware. Access is for invited colleagues only.
+  <p class="landing-note">
+    Inference runs on self-hosted hardware. Access is for invited coworkers.
   </p>
-</section>
+</div>
 {{end}}

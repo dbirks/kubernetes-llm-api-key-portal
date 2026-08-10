@@ -1,18 +1,23 @@
 {{define "title"}}{{.Heading}}{{end}}
 
 {{define "main"}}
-<section class="section narrow">
+<div class="panel panel-pad panel-narrow">
   <h1>{{.Heading}}</h1>
-  <p class="lede">{{.Message}}</p>
-
-  <p class="form-actions">
-    <a class="button button-quiet" href="/">Go to the start</a>
-  </p>
+  <p class="error-message">{{.Message}}</p>
 
   {{if .RequestID}}
-  <p class="fine-print">
-    If you report this, include reference <code>{{.RequestID}}</code>.
+  <p class="request-id">
+    <span class="request-id-label">request</span>
+    <span class="request-id-value">{{.RequestID}}</span>
   </p>
   {{end}}
-</section>
+
+  <div class="form-actions">
+    {{if .User}}
+    <a class="button button-outline" href="/account">Back to keys</a>
+    {{else}}
+    <a class="button button-outline" href="/">Go to the start</a>
+    {{end}}
+  </div>
+</div>
 {{end}}

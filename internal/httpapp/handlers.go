@@ -30,6 +30,14 @@ func (a *App) page(w http.ResponseWriter, r *http.Request, title string) Page {
 	return p
 }
 
+// withNav marks which navigation item the layout should show as current. It
+// reads as part of the view model literal, which keeps each handler to one
+// statement.
+func (p Page) withNav(nav string) Page {
+	p.ActiveNav = nav
+	return p
+}
+
 // owner extracts the authorization identity from the session. Handlers behind
 // RequireUser can rely on ok being true.
 func owner(r *http.Request) (keystore.Owner, bool) {
@@ -52,6 +60,14 @@ func (a *App) handleLanding(w http.ResponseWriter, r *http.Request) {
 	}
 	a.mustRender(w, r, http.StatusOK, "landing.html", LandingPage{
 		Page: a.page(w, r, a.brand.Name),
+	})
+}
+
+// handleHowItWorks serves the static explainer. It carries no per-user data, so
+// it is readable signed in or out.
+func (a *App) handleHowItWorks(w http.ResponseWriter, r *http.Request) {
+	a.mustRender(w, r, http.StatusOK, "howitworks.html", HowItWorksPage{
+		Page: a.page(w, r, "How it works").withNav("howitworks"),
 	})
 }
 
@@ -125,19 +141,21 @@ func (a *App) handleAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	views := toKeyViews(keys)
 	params := a.onboarding
 	a.mustRender(w, r, http.StatusOK, "account.html", AccountPage{
-		Page:   a.page(w, r, "Account"),
-		Keys:   toKeyViews(keys),
-		Guides: onboarding.Guides(params),
-		EnvVar: onboarding.EnvVar(params),
+		Page:          a.page(w, r, "Account").withNav("keys"),
+		Keys:          views,
+		Guides:        onboarding.Guides(params),
+		EnvVar:        onboarding.EnvVar(params),
+		SelectedKeyID: selectedKey(views, r.URL.Query().Get("key")),
 	})
 }
 
 func (a *App) handleNewKey(w http.ResponseWriter, r *http.Request) {
 	noStore(w)
 	a.mustRender(w, r, http.StatusOK, "key_new.html", NewKeyPage{
-		Page: a.page(w, r, "Create API key"),
+		Page: a.page(w, r, "Create API key").withNav("keys"),
 	})
 }
 
@@ -159,7 +177,7 @@ func (a *App) handleCreateKey(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// Re-render the form with the problem, keeping what the user typed.
 		a.mustRender(w, r, http.StatusBadRequest, "key_new.html", NewKeyPage{
-			Page:      a.page(w, r, "Create API key"),
+			Page:      a.page(w, r, "Create API key").withNav("keys"),
 			Name:      truncate(rawName, 200),
 			NameError: userMessage(err),
 		})
@@ -190,7 +208,7 @@ func (a *App) handleCreateKey(w http.ResponseWriter, r *http.Request) {
 	params := a.onboarding
 	params.APIKey = created.Secret
 	a.mustRender(w, r, http.StatusOK, "key_created.html", CreatedKeyPage{
-		Page:    a.page(w, r, "API key created"),
+		Page:    a.page(w, r, "API key created").withNav("keys"),
 		KeyName: created.Name,
 		Secret:  created.Secret,
 		Guides:  onboarding.Guides(params),
@@ -208,7 +226,7 @@ func (a *App) handleRevokeConfirm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.mustRender(w, r, http.StatusOK, "key_revoke.html", RevokePage{
-		Page: a.page(w, r, "Revoke API key"),
+		Page: a.page(w, r, "Revoke API key").withNav("keys"),
 		Key:  toKeyView(key),
 	})
 }
@@ -281,6 +299,22 @@ func toKeyViews(keys []keystore.KeyMetadata) []KeyView {
 		out = append(out, toKeyView(k))
 	}
 	return out
+}
+
+// selectedKey resolves the ?key= display preference against the keys the user
+// actually owns. An id that is unknown, or that belongs to someone else, falls
+// back to the first key rather than erroring: which pane is open is not an
+// authorization decision, and a 404 here would report whether an id exists.
+func selectedKey(keys []KeyView, want string) string {
+	for _, k := range keys {
+		if k.ID == want {
+			return k.ID
+		}
+	}
+	if len(keys) == 0 {
+		return ""
+	}
+	return keys[0].ID
 }
 
 func toKeyView(k keystore.KeyMetadata) KeyView {
