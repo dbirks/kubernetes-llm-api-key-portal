@@ -31,11 +31,37 @@ var (
 	ErrWrongTenant = errors.New("account is not in an accepted tenant")
 )
 
+// graphPhotoScope is the delegated permission that lets the portal read the
+// signed-in user's own profile photo.
+//
+// It is requested only when profile photos are enabled. User.Read is
+// user-consentable, so it does not introduce an admin-consent requirement, and
+// it is delegated, so the portal can only ever read the photo of whoever is
+// signed in — there is no path from here to reading the directory.
+const graphPhotoScope = "https://graph.microsoft.com/User.Read"
+
+// PhotoCapturer records the signed-in user's profile photo during the callback.
+//
+// It takes the Graph access token as an argument so that the token never leaves
+// this package in a field or a return value. It is handed over for the duration
+// of one call and dropped, which is what keeps the portal free of any stored
+// Graph credential and free of a refresh-token story to secure.
+//
+// Implementations must not return errors: a photo is decoration, and no failure
+// to fetch one may turn into a failed sign-in.
+type PhotoCapturer interface {
+	Capture(ctx context.Context, key, accessToken string)
+}
+
 // Authenticator drives the OIDC authorization-code flow.
 type Authenticator struct {
 	oauth    *oauth2.Config
 	verifier *oidc.IDTokenVerifier
 	sealer   *Sealer
+
+	// photos is nil when profile photos are disabled, which also removes the
+	// Graph scope from the authorization request.
+	photos PhotoCapturer
 
 	// acceptedTenants is the set of Entra tenant IDs allowed to sign in.
 	//
@@ -53,6 +79,10 @@ type AuthenticatorConfig struct {
 	ClientSecret string
 	RedirectURL  string
 	Tenants      []string
+
+	// Photos, when non-nil, adds the Graph User.Read scope to the sign-in
+	// request and receives the user's profile photo during the callback.
+	Photos PhotoCapturer
 }
 
 // NewAuthenticator performs OIDC discovery against the configured issuer.
@@ -74,20 +104,26 @@ func NewAuthenticator(ctx context.Context, cfg AuthenticatorConfig, sealer *Seal
 		return nil, errors.New("at least one accepted tenant is required")
 	}
 
+	// Authentication first: these three are all the portal needs to know who
+	// someone is. The Graph scope below is additive and purely cosmetic, and
+	// its absence changes nothing about sign-in.
+	scopes := []string{oidc.ScopeOpenID, "profile", "email"}
+	if cfg.Photos != nil {
+		scopes = append(scopes, graphPhotoScope)
+	}
+
 	return &Authenticator{
 		oauth: &oauth2.Config{
 			ClientID:     cfg.ClientID,
 			ClientSecret: cfg.ClientSecret,
 			RedirectURL:  cfg.RedirectURL,
 			Endpoint:     provider.Endpoint(),
-			// Authentication only. The portal has no use for Microsoft Graph,
-			// so it asks for no Graph scopes and needs no admin consent beyond
-			// basic sign-in.
-			Scopes: []string{oidc.ScopeOpenID, "profile", "email"},
+			Scopes:       scopes,
 		},
 		// go-oidc checks the signature, issuer, audience, and expiry.
 		verifier:        provider.Verifier(&oidc.Config{ClientID: cfg.ClientID}),
 		sealer:          sealer,
+		photos:          cfg.Photos,
 		acceptedTenants: accepted,
 	}, nil
 }
@@ -226,6 +262,19 @@ func (a *Authenticator) Complete(w http.ResponseWriter, r *http.Request) (Sessio
 		Name:     claims.Name,
 		Email:    email,
 	}
+
+	// Synchronous on purpose. The redirect that follows lands on a page that
+	// renders the avatar, so fetching in the background would show initials on
+	// the first paint and the photo only after a reload. Capture bounds its own
+	// time and cannot fail, so the cost is a few hundred milliseconds added to
+	// a flow that has just made several round trips to Microsoft.
+	//
+	// This is also the only moment a Graph token exists. It is passed here and
+	// then goes out of scope with the rest of the exchange.
+	if a.photos != nil {
+		a.photos.Capture(r.Context(), user.PhotoKey(), token.AccessToken)
+	}
+
 	if err := a.sealer.Issue(w, user); err != nil {
 		return SessionUser{}, "", err
 	}

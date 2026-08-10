@@ -32,6 +32,15 @@ type Config struct {
 	EntraClientID     string
 	EntraClientSecret string
 
+	// EntraAvatars enables Microsoft Graph profile photos in the header.
+	//
+	// On by default. Turning it off drops the Graph User.Read scope from the
+	// sign-in request entirely, which is the setting to reach for in a tenant
+	// that has disabled user consent, or where reading photos is not wanted.
+	// Users then get an initials badge, which is also the fallback for anyone
+	// who simply has no photo.
+	EntraAvatars bool
+
 	// SessionKeys holds one or more 32+ byte secrets. The first is used to seal
 	// new sessions; the rest are accepted when opening, which makes rotation a
 	// matter of prepending a new key and later dropping the old one.
@@ -96,6 +105,7 @@ func Load() (*Config, error) {
 		EntraTenantID:     strings.TrimSpace(os.Getenv("ENTRA_TENANT_ID")),
 		EntraClientID:     strings.TrimSpace(os.Getenv("ENTRA_CLIENT_ID")),
 		EntraClientSecret: os.Getenv("ENTRA_CLIENT_SECRET"),
+		EntraAvatars:      boolEnvDefault("ENTRA_AVATARS", true),
 
 		KubernetesNamespace:    strings.TrimSpace(os.Getenv("KUBERNETES_NAMESPACE")),
 		KubernetesKubeconfig:   strings.TrimSpace(os.Getenv("KUBECONFIG")),
@@ -310,4 +320,19 @@ func lookupDefault(key, fallback string) string {
 func boolEnv(key string) bool {
 	v, err := strconv.ParseBool(strings.TrimSpace(os.Getenv(key)))
 	return err == nil && v
+}
+
+// boolEnvDefault is boolEnv for settings that are on unless switched off. An
+// unparseable value keeps the default rather than silently reading as false,
+// so a typo cannot quietly disable a feature.
+func boolEnvDefault(key string, fallback bool) bool {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return fallback
+	}
+	v, err := strconv.ParseBool(raw)
+	if err != nil {
+		return fallback
+	}
+	return v
 }

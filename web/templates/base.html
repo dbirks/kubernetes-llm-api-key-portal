@@ -53,7 +53,17 @@
     */}}
     <details class="usermenu" data-usermenu>
       <summary class="usermenu-trigger">
+        {{/*
+          AvatarURL is empty whenever there is no photo to show, so the initials
+          badge is the fallback rather than a broken image. Both are decorative:
+          the name sits next to them in text, which is why each is aria-hidden.
+        */}}
+        {{if .User.AvatarURL}}
+        <img class="avatar avatar-photo" src="{{.User.AvatarURL}}" alt="" width="22" height="22"
+             decoding="async" aria-hidden="true">
+        {{else}}
         <span class="avatar" aria-hidden="true">{{.User.Initials}}</span>
+        {{end}}
         <span class="usermenu-name">{{.User.Name}}</span>
         <span class="usermenu-caret" aria-hidden="true">▾</span>
       </summary>

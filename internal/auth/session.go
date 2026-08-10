@@ -50,6 +50,18 @@ type SessionUser struct {
 	IssuedAt time.Time `json:"iat"`
 }
 
+// PhotoKey identifies this user's cached profile photo.
+//
+// It is the same tenant-and-object pair that authorises key access, and it is
+// read from the sealed session rather than from a URL, so a request can only
+// ever address the caller's own photo.
+func (u SessionUser) PhotoKey() string {
+	if u.TenantID == "" || u.ObjectID == "" {
+		return ""
+	}
+	return u.TenantID + ":" + u.ObjectID
+}
+
 // Sealer encrypts and authenticates session payloads.
 //
 // Keys are used in order: the first seals, and every key is tried when opening.

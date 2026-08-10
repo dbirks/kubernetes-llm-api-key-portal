@@ -14,10 +14,21 @@ import (
 	"net/http"
 
 	"github.com/dbirks/kubernetes-llm-api-key-portal/internal/auth"
+	"github.com/dbirks/kubernetes-llm-api-key-portal/internal/avatar"
 	"github.com/dbirks/kubernetes-llm-api-key-portal/internal/brand"
 	"github.com/dbirks/kubernetes-llm-api-key-portal/internal/keystore"
 	"github.com/dbirks/kubernetes-llm-api-key-portal/internal/onboarding"
 )
+
+// PhotoStore reads cached profile photos.
+//
+// Declared here rather than imported as a concrete type so that the web layer
+// depends on the capability and not on the Graph client behind it, matching how
+// it already treats the keystore and the auth provider.
+type PhotoStore interface {
+	Get(key string) (avatar.Photo, bool)
+	Forget(key string)
+}
 
 // Options configures the application.
 type Options struct {
@@ -35,6 +46,10 @@ type Options struct {
 
 	// Onboarding parameterises the generated client setup guides.
 	Onboarding onboarding.Params
+
+	// Photos serves cached profile photos. Nil disables avatars, and every
+	// user falls back to an initials badge.
+	Photos PhotoStore
 
 	// SecureCookies mirrors whether the public origin is https.
 	SecureCookies bool
@@ -55,6 +70,7 @@ type App struct {
 
 	assets     fs.FS
 	onboarding onboarding.Params
+	photos     PhotoStore
 
 	secureCookies bool
 	devMode       bool
@@ -85,6 +101,7 @@ func New(opts Options) (*App, error) {
 		renderer:      r,
 		assets:        opts.Assets,
 		onboarding:    opts.Onboarding,
+		photos:        opts.Photos,
 		secureCookies: opts.SecureCookies,
 		devMode:       opts.DevMode,
 	}
@@ -121,6 +138,7 @@ func (a *App) routes() http.Handler {
 	mux.Handle("POST /keys", protected(a.handleCreateKey))
 	mux.Handle("GET /keys/{id}/revoke", protected(a.handleRevokeConfirm))
 	mux.Handle("POST /keys/{id}/revoke", protected(a.handleRevokeKey))
+	mux.Handle("GET /me/avatar", protected(a.handleAvatar))
 	mux.Handle("POST /logout", protected(a.handleLogout))
 
 	// Cross-origin protection covers every state-changing request. Go's

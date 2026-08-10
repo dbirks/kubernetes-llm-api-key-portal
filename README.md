@@ -51,7 +51,7 @@ internals.
 
 ## What it deliberately does not do
 
-No user database. No password handling. No Microsoft Graph calls. No inference proxying — `/v1/*`
+No user database. No password handling. No inference proxying — `/v1/*`
 never touches this service. No API-key validation on the request path; that is the gateway's job.
 No admin UI, quotas, billing, usage dashboards, or key expiry. No React, no build chain, no
 JavaScript framework, and no third-party assets of any kind.
@@ -122,8 +122,14 @@ In the Microsoft Entra admin center, under **App registrations → New registrat
    *Directory (tenant) ID* into `ENTRA_TENANT_ID`.
 4. Under **Certificates & secrets**, create a client secret and put its **value** (not its ID) into
    `ENTRA_CLIENT_SECRET`. Note the expiry date — a silently expired secret breaks sign-in.
-5. Under **API permissions**, the default delegated `User.Read` is enough. The portal requests only
-   `openid`, `profile`, and `email`, and never calls Microsoft Graph.
+5. Under **API permissions**, the delegated `User.Read` is enough — and is what the default profile
+   photo feature needs. Beyond sign-in the portal makes exactly one Graph call, for the signed-in
+   user's own photo. Set `ENTRA_AVATARS=false` to drop that scope and show initials instead.
+
+   Never grant an **Application** permission, and never `User.Read.All`, `User.ReadBasic.All`,
+   `Directory.Read.All`, or `offline_access`. Delegated `User.Read` lets the portal read the photo of
+   whoever is signed in and nothing else; the tenant-wide variants would turn a low-risk sign-in app
+   into a directory reader whose client secret is worth stealing.
 
 The portal does not require Enterprise Application user assignment. Any account in the configured
 tenant may sign in.
@@ -148,6 +154,27 @@ startup failure, and every problem is reported at once rather than one per resta
 
 `ENTRA_*` are not required when `DEV_FAKE_AUTH` is set.
 
+### Profile photos
+
+`ENTRA_AVATARS` (default `true`) shows each user's Microsoft profile photo in the header. Set it to
+`false` to turn the feature off, which also removes the Graph `User.Read` scope from the sign-in
+request — the setting to reach for in a tenant that has disabled user consent.
+
+Everything about this is best-effort, and initials are the fallback in every failure case:
+
+- The photo is fetched **once**, during the sign-in callback, using the access token from that
+  exchange. The token is then discarded. Nothing here is ever stored, so there is no refresh-token
+  story and no Graph credential at rest.
+- The cache is **per-process and in memory**. With more than one replica, a user who signs in on one
+  pod and is later served by another sees initials there until their next sign-in. That is the price
+  of not persisting a Graph-capable token, and it is the right side of that trade.
+- Many users have no photo at all. Sized variants exist only for photos stored in Exchange Online,
+  so a user without a mailbox has only the unsized endpoint, and a user who never uploaded one has
+  neither. Both render as initials, which is not a fault.
+- Fetched bytes are only served back if they decode as JPEG or PNG, are under 1 MiB, and are at most
+  2048px on a side. The content type is derived from the bytes, never from what Graph claimed.
+- `DEV_FAKE_AUTH` never fetches photos: the fake sign-in has no token and no real user behind it.
+
 ### Optional
 
 | Variable | Default | Description |
@@ -159,6 +186,7 @@ startup failure, and every problem is reported at once rather than one per resta
 | `KUBERNETES_ALLOW_KUBECONFIG` | `false` | Permit falling back to a local kubeconfig outside a cluster. |
 | `API_KEY_PREFIX` | `llm_` | Prefix on generated credentials. |
 | `DEFAULT_MODEL` | — | Served model name used in the setup snippets. |
+| `ENTRA_AVATARS` | `true` | Microsoft profile photos in the header. See above. |
 | `INFERENCE_BASE_URL` | `PUBLIC_BASE_URL` | Set only if `/v1/*` lives on a different hostname than the portal. |
 | `DEV_ASSETS_DIR` | — | Serve templates and CSS from disk with per-request reload. |
 | `DEV_FAKE_AUTH` | `false` | Development sign-in bypass. See the guard rails above. |

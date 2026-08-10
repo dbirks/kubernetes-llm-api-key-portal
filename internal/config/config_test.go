@@ -12,7 +12,7 @@ func setEnv(t *testing.T, env map[string]string) {
 	t.Helper()
 	known := []string{
 		"PORT", "PUBLIC_BASE_URL", "LOG_LEVEL",
-		"ENTRA_TENANT_ID", "ENTRA_CLIENT_ID", "ENTRA_CLIENT_SECRET",
+		"ENTRA_TENANT_ID", "ENTRA_CLIENT_ID", "ENTRA_CLIENT_SECRET", "ENTRA_AVATARS",
 		"SESSION_KEY", "KEYSTORE_MODE", "KUBERNETES_NAMESPACE",
 		"KUBERNETES_ALLOW_KUBECONFIG", "KUBECONFIG",
 		"API_KEY_PREFIX", "DEFAULT_MODEL", "INFERENCE_BASE_URL", "DEV_FAKE_AUTH",
@@ -317,5 +317,50 @@ func TestBrandOverrides(t *testing.T) {
 	}
 	if cfg.Brand.Accent != "#0f766e" || cfg.Brand.SupportEmail != "help@birks.dev" {
 		t.Errorf("brand overrides not applied: %+v", cfg.Brand)
+	}
+}
+
+// Avatars are on unless switched off, so an existing deployment picks them up
+// without a config change.
+func TestAvatarsDefaultOn(t *testing.T) {
+	setEnv(t, productionEnv())
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !cfg.EntraAvatars {
+		t.Error("EntraAvatars is false by default, want true")
+	}
+}
+
+func TestAvatarsCanBeDisabled(t *testing.T) {
+	env := productionEnv()
+	env["ENTRA_AVATARS"] = "false"
+	setEnv(t, env)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.EntraAvatars {
+		t.Error("EntraAvatars is true, want false when ENTRA_AVATARS=false")
+	}
+}
+
+// A typo must not silently switch the feature off, which is what a bare
+// ParseBool would do.
+func TestUnparseableAvatarsSettingKeepsTheDefault(t *testing.T) {
+	for _, raw := range []string{"yes please", "off!", "  "} {
+		env := productionEnv()
+		env["ENTRA_AVATARS"] = raw
+		setEnv(t, env)
+
+		cfg, err := Load()
+		if err != nil {
+			t.Fatalf("Load with ENTRA_AVATARS=%q: %v", raw, err)
+		}
+		if !cfg.EntraAvatars {
+			t.Errorf("ENTRA_AVATARS=%q disabled avatars, want the default to hold", raw)
+		}
 	}
 }

@@ -1,10 +1,12 @@
 package httpapp
 
 import (
+	"bytes"
 	"errors"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/dbirks/kubernetes-llm-api-key-portal/internal/auth"
 	"github.com/dbirks/kubernetes-llm-api-key-portal/internal/keystore"
@@ -26,8 +28,49 @@ func (a *App) page(w http.ResponseWriter, r *http.Request, title string) Page {
 			Email:    u.Email,
 			Initials: initials(u.Name, u.Email),
 		}
+		// Only offer the URL when the bytes are already cached, so the layout
+		// never renders an <img> that resolves to a 404 and leaves a broken
+		// image where the initials badge should be.
+		if a.photos != nil {
+			if photo, ok := a.photos.Get(u.PhotoKey()); ok {
+				p.User.AvatarURL = "/me/avatar?v=" + photo.Version
+			}
+		}
 	}
 	return p
+}
+
+// handleAvatar serves the signed-in user's cached profile photo.
+//
+// The route takes no user identifier: the key comes from the session, so there
+// is nothing to enumerate and no ownership check to get wrong. A user with no
+// cached photo gets a 404, which is the same answer as a user who never had one.
+func (a *App) handleAvatar(w http.ResponseWriter, r *http.Request) {
+	u, ok := auth.UserFrom(r.Context())
+	if !ok || a.photos == nil {
+		http.NotFound(w, r)
+		return
+	}
+	photo, ok := a.photos.Get(u.PhotoKey())
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+
+	h := w.Header()
+	// Derived from the bytes, not from what Graph claimed the type was.
+	h.Set("Content-Type", photo.ContentType)
+	h.Set("ETag", `"`+photo.Version+`"`)
+	// private, because the path is identical for every user and a shared cache
+	// keying on it alone would hand one person's face to another. Vary: Cookie
+	// says the same thing again for anything that ignores private.
+	h.Set("Cache-Control", "private, max-age=3600")
+	h.Set("Vary", "Cookie")
+
+	// ServeContent answers If-None-Match against the ETag above. The zero
+	// modtime suppresses Last-Modified, which would otherwise leak roughly when
+	// the user signed in.
+	http.ServeContent(w, r, "", time.Time{}, bytes.NewReader(photo.Bytes))
 }
 
 // withNav marks which navigation item the layout should show as current. It
@@ -119,6 +162,9 @@ func (a *App) handleCallback(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleLogout(w http.ResponseWriter, r *http.Request) {
+	if u, ok := auth.UserFrom(r.Context()); ok && a.photos != nil {
+		a.photos.Forget(u.PhotoKey())
+	}
 	a.sealer.Clear(w)
 	a.sealer.SetFlash(w, auth.FlashInfo, "You're signed out.")
 	http.Redirect(w, r, "/", http.StatusSeeOther)

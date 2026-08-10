@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/dbirks/kubernetes-llm-api-key-portal/internal/auth"
+	"github.com/dbirks/kubernetes-llm-api-key-portal/internal/avatar"
 	"github.com/dbirks/kubernetes-llm-api-key-portal/internal/brand"
 	"github.com/dbirks/kubernetes-llm-api-key-portal/internal/config"
 	"github.com/dbirks/kubernetes-llm-api-key-portal/internal/keystore"
@@ -29,6 +30,13 @@ type testHarness struct {
 }
 
 func newHarness(t *testing.T) *testHarness {
+	t.Helper()
+	return newHarnessWithPhotos(t, nil)
+}
+
+// newHarnessWithPhotos assembles the app with a profile-photo store. Passing nil
+// is the avatars-disabled configuration, which is what newHarness uses.
+func newHarnessWithPhotos(t *testing.T, photos PhotoStore) *testHarness {
 	t.Helper()
 
 	var logs bytes.Buffer
@@ -60,6 +68,7 @@ func newHarness(t *testing.T) *testHarness {
 		Sealer: sealer,
 		Auth:   auth.NewFakeAuthenticator(sealer, auth.FakeUser),
 		Assets: web.Assets(),
+		Photos: photos,
 		Onboarding: onboarding.Params{
 			BaseURL:   "https://llm.birks.dev",
 			Model:     "Qwen3-Coder-30B",
@@ -659,4 +668,166 @@ func extractSecret(t *testing.T, body string) string {
 		t.Fatalf("extracted credential %q looks wrong", secret)
 	}
 	return secret
+}
+
+// stubPhotos is a PhotoStore backed by a map, so a handler test does not need
+// Microsoft Graph or the real cache's expiry behaviour.
+type stubPhotos map[string]avatar.Photo
+
+func (s stubPhotos) Get(key string) (avatar.Photo, bool) {
+	p, ok := s[key]
+	return p, ok
+}
+
+func (s stubPhotos) Forget(key string) { delete(s, key) }
+
+func testPhoto() avatar.Photo {
+	return avatar.Photo{
+		Bytes:       []byte("\x89PNG\r\n\x1a\nnot-really-decoded-here"),
+		ContentType: "image/png",
+		Version:     "v1abc",
+	}
+}
+
+func TestAvatarIsServedToItsOwner(t *testing.T) {
+	photo := testPhoto()
+	h := newHarnessWithPhotos(t, stubPhotos{auth.FakeUser.PhotoKey(): photo})
+	session := h.signIn(t, auth.FakeUser)
+
+	rec := h.do(t, httptest.NewRequest(http.MethodGet, "/me/avatar", nil), session)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	if got := rec.Body.Bytes(); !bytes.Equal(got, photo.Bytes) {
+		t.Error("served bytes differ from the cached photo")
+	}
+	if got := rec.Header().Get("Content-Type"); got != "image/png" {
+		t.Errorf("Content-Type = %q, want image/png", got)
+	}
+	if got := rec.Header().Get("ETag"); got != `"v1abc"` {
+		t.Errorf("ETag = %q, want a quoted version", got)
+	}
+}
+
+// The avatar path is identical for every user, so it must never be stored in a
+// shared cache: private plus Vary: Cookie is what keeps one person's photo from
+// being served to another.
+func TestAvatarIsNotSharedCacheable(t *testing.T) {
+	h := newHarnessWithPhotos(t, stubPhotos{auth.FakeUser.PhotoKey(): testPhoto()})
+	session := h.signIn(t, auth.FakeUser)
+
+	rec := h.do(t, httptest.NewRequest(http.MethodGet, "/me/avatar", nil), session)
+	if cc := rec.Header().Get("Cache-Control"); !strings.Contains(cc, "private") {
+		t.Errorf("Cache-Control = %q, want it to include private", cc)
+	}
+	if v := rec.Header().Get("Vary"); !strings.Contains(v, "Cookie") {
+		t.Errorf("Vary = %q, want it to include Cookie", v)
+	}
+}
+
+// Last-Modified would disclose roughly when the user signed in.
+func TestAvatarSendsNoLastModified(t *testing.T) {
+	h := newHarnessWithPhotos(t, stubPhotos{auth.FakeUser.PhotoKey(): testPhoto()})
+	session := h.signIn(t, auth.FakeUser)
+
+	rec := h.do(t, httptest.NewRequest(http.MethodGet, "/me/avatar", nil), session)
+	if got := rec.Header().Get("Last-Modified"); got != "" {
+		t.Errorf("Last-Modified = %q, want it absent", got)
+	}
+}
+
+func TestAvatarRevalidatesWithETag(t *testing.T) {
+	h := newHarnessWithPhotos(t, stubPhotos{auth.FakeUser.PhotoKey(): testPhoto()})
+	session := h.signIn(t, auth.FakeUser)
+
+	req := httptest.NewRequest(http.MethodGet, "/me/avatar", nil)
+	req.Header.Set("If-None-Match", `"v1abc"`)
+	rec := h.do(t, req, session)
+	if rec.Code != http.StatusNotModified {
+		t.Errorf("status = %d, want 304 for a matching ETag", rec.Code)
+	}
+}
+
+func TestAvatarRequiresASession(t *testing.T) {
+	h := newHarnessWithPhotos(t, stubPhotos{auth.FakeUser.PhotoKey(): testPhoto()})
+
+	rec := h.do(t, httptest.NewRequest(http.MethodGet, "/me/avatar", nil), nil)
+	if rec.Code == http.StatusOK {
+		t.Fatal("served an avatar without a session")
+	}
+	if rec.Body.Len() > 0 && bytes.Contains(rec.Body.Bytes(), testPhoto().Bytes) {
+		t.Error("photo bytes leaked to an unauthenticated request")
+	}
+}
+
+// The route carries no user identifier, so one user's session must never reach
+// another's photo even though the URL is the same for everyone.
+func TestAvatarIsNotReachableByAnotherUser(t *testing.T) {
+	other := auth.SessionUser{
+		TenantID: auth.FakeUser.TenantID,
+		ObjectID: "00000000-0000-0000-0000-0000000000b2",
+		Name:     "Other Person",
+	}
+	h := newHarnessWithPhotos(t, stubPhotos{auth.FakeUser.PhotoKey(): testPhoto()})
+
+	rec := h.do(t, httptest.NewRequest(http.MethodGet, "/me/avatar", nil), h.signIn(t, other))
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want 404 for a user with no cached photo", rec.Code)
+	}
+	if bytes.Contains(rec.Body.Bytes(), testPhoto().Bytes) {
+		t.Error("another user's photo was served")
+	}
+}
+
+func TestAvatarIs404WhenAvatarsAreDisabled(t *testing.T) {
+	h := newHarness(t)
+	rec := h.do(t, httptest.NewRequest(http.MethodGet, "/me/avatar", nil), h.signIn(t, auth.FakeUser))
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want 404 when no photo store is configured", rec.Code)
+	}
+}
+
+// The header must render an <img> only when the bytes are cached, so a page
+// never contains an avatar URL that resolves to a 404.
+func TestHeaderRendersThePhotoWhenPresent(t *testing.T) {
+	h := newHarnessWithPhotos(t, stubPhotos{auth.FakeUser.PhotoKey(): testPhoto()})
+	session := h.signIn(t, auth.FakeUser)
+
+	body := h.do(t, httptest.NewRequest(http.MethodGet, "/account", nil), session).Body.String()
+	if !strings.Contains(body, `src="/me/avatar?v=v1abc"`) {
+		t.Error("account page does not reference the cached avatar")
+	}
+}
+
+func TestHeaderFallsBackToInitials(t *testing.T) {
+	for name, h := range map[string]*testHarness{
+		"avatars disabled": newHarness(t),
+		"no cached photo":  newHarnessWithPhotos(t, stubPhotos{}),
+	} {
+		t.Run(name, func(t *testing.T) {
+			session := h.signIn(t, auth.FakeUser)
+			body := h.do(t, httptest.NewRequest(http.MethodGet, "/account", nil), session).Body.String()
+
+			if strings.Contains(body, "/me/avatar") {
+				t.Error("page references an avatar that would 404")
+			}
+			if !strings.Contains(body, initials(auth.FakeUser.Name, auth.FakeUser.Email)) {
+				t.Error("page does not fall back to the initials badge")
+			}
+		})
+	}
+}
+
+func TestLogoutDropsTheCachedPhoto(t *testing.T) {
+	photos := stubPhotos{auth.FakeUser.PhotoKey(): testPhoto()}
+	h := newHarnessWithPhotos(t, photos)
+	session := h.signIn(t, auth.FakeUser)
+
+	rec := h.do(t, postForm("/logout", nil), session)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want 303", rec.Code)
+	}
+	if _, ok := photos.Get(auth.FakeUser.PhotoKey()); ok {
+		t.Error("photo is still cached after sign-out")
+	}
 }

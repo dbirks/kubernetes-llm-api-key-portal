@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/dbirks/kubernetes-llm-api-key-portal/internal/auth"
+	"github.com/dbirks/kubernetes-llm-api-key-portal/internal/avatar"
 	"github.com/dbirks/kubernetes-llm-api-key-portal/internal/brand"
 	"github.com/dbirks/kubernetes-llm-api-key-portal/internal/config"
 	"github.com/dbirks/kubernetes-llm-api-key-portal/internal/httpapp"
@@ -85,7 +86,16 @@ func run() error {
 		return err
 	}
 
-	authProvider, err := buildAuthProvider(cfg, sealer, log)
+	// Built before the auth provider because the provider writes to it during
+	// the callback, and read by the web layer when rendering the header. Nil
+	// when avatars are off, which both drops the Graph scope and makes every
+	// user render as initials.
+	var photos *avatar.Store
+	if cfg.EntraAvatars && !cfg.DevFakeAuth {
+		photos = avatar.New(avatar.Options{Log: log})
+	}
+
+	authProvider, err := buildAuthProvider(cfg, sealer, photos, log)
 	if err != nil {
 		return err
 	}
@@ -105,6 +115,7 @@ func run() error {
 		ReloadTemplates: reload,
 		SecureCookies:   secureCookies,
 		DevMode:         cfg.DevFakeAuth,
+		Photos:          photoStore(photos),
 		Onboarding: onboarding.Params{
 			BaseURL:   cfg.InferenceBaseURL.String(),
 			Model:     cfg.DefaultModel,
@@ -165,7 +176,29 @@ func seedDevKeys(store *memory.Store) {
 	store.Seed(owner, "Workstation", "D4e5F6", now.AddDate(0, 0, -3))
 }
 
-func buildAuthProvider(cfg *config.Config, sealer *auth.Sealer, log *slog.Logger) (auth.Provider, error) {
+// capturer and photoStore convert a possibly-nil *avatar.Store into the
+// interfaces the auth and web layers consume.
+//
+// They exist because assigning a nil *avatar.Store directly to an interface
+// field yields a non-nil interface holding a nil pointer. Every "are avatars
+// enabled?" check downstream would then read true, and the sign-in request would
+// ask for the Graph scope in a deployment that had deliberately switched avatars
+// off. Converting in one place makes that unrepresentable.
+func capturer(s *avatar.Store) auth.PhotoCapturer {
+	if s == nil {
+		return nil
+	}
+	return s
+}
+
+func photoStore(s *avatar.Store) httpapp.PhotoStore {
+	if s == nil {
+		return nil
+	}
+	return s
+}
+
+func buildAuthProvider(cfg *config.Config, sealer *auth.Sealer, photos *avatar.Store, log *slog.Logger) (auth.Provider, error) {
 	if cfg.DevFakeAuth {
 		return auth.NewFakeAuthenticator(sealer, auth.FakeUser), nil
 	}
@@ -181,13 +214,15 @@ func buildAuthProvider(cfg *config.Config, sealer *auth.Sealer, log *slog.Logger
 		ClientSecret: cfg.EntraClientSecret,
 		RedirectURL:  cfg.RedirectURL(),
 		Tenants:      []string{cfg.EntraTenantID},
+		Photos:       capturer(photos),
 	}, sealer)
 	if err != nil {
 		return nil, fmt.Errorf("entra sign-in: %w", err)
 	}
 	log.Info("entra sign-in configured",
 		"tenant_id", cfg.EntraTenantID,
-		"redirect_url", cfg.RedirectURL())
+		"redirect_url", cfg.RedirectURL(),
+		"profile_photos", photos != nil)
 	return authenticator, nil
 }
 

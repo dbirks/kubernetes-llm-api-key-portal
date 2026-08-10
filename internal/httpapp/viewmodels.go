@@ -20,6 +20,12 @@ type User struct {
 	Name     string
 	Email    string
 	Initials string
+
+	// AvatarURL is the signed-in user's profile photo, or "" when there is
+	// none. Templates must treat it as optional and fall back to Initials:
+	// avatars are absent whenever the feature is off, the user has no photo,
+	// or the photo is not in this replica's cache.
+	AvatarURL string
 }
 
 // Page is embedded in every page's view model.
