@@ -37,8 +37,20 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           # An immutable sha tag always exists, so a deployment can pin to an
           # exact commit rather than a moving tag.
+          #
+          # The timestamp-prefixed tag exists so Flux's image-reflector can pick
+          # "newest" by sorting: a bare sha is immutable but not orderable, and
+          # `main` is orderable only by being mutable, which defeats pinning.
+          # It carries the same digest as the sha tag; nothing extra is built.
+          #
+          # commit_date, not date: the build clock would make a re-run of an old
+          # commit sort ahead of every newer one, so retrying a failed publish
+          # would quietly roll the cluster backwards. The commit clock cannot.
+          # github.sha rather than the {{sha}} expression, which is the 7-char
+          # short form — the consuming ImagePolicy matches a full 40-hex sha.
           tags: |
             type=sha,format=long
+            type=raw,value={{commit_date 'YYYYMMDDHHmmss'}}-${{ github.sha }}
             type=ref,event=branch
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
