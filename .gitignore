@@ -1,0 +1,7 @@
+# Build output
+/ai-account
+/dist/
+
+# Local environment overrides; may contain the Entra client secret
+.env
+.env.local

@@ -1,0 +1,23 @@
+id: claude-code
+name: Claude Code
+
+Point Claude Code at Birks AI using gateway bearer authentication. The endpoint implements the Anthropic Messages API, so no translation layer is needed.
+
+--- commands (bash) ---
+export BIRKS_AI_API_KEY="YOUR_API_KEY"
+
+export ANTHROPIC_BASE_URL="https://ai.birks.dev"
+export ANTHROPIC_AUTH_TOKEN="$BIRKS_AI_API_KEY"
+export ANTHROPIC_DEFAULT_OPUS_MODEL="Qwen3-Coder-30B"
+export ANTHROPIC_DEFAULT_SONNET_MODEL="Qwen3-Coder-30B"
+export ANTHROPIC_DEFAULT_HAIKU_MODEL="Qwen3-Coder-30B"
+
+claude
+
+--- notes ---
+- Add the exports to your shell profile to make them permanent.
+- The three model variables map Claude Code's Opus, Sonnet, and Haiku slots onto the single served model, so every mode routes to the same place.
+- ANTHROPIC_AUTH_TOKEN is the gateway bearer token. Leave ANTHROPIC_API_KEY unset so it cannot take precedence.
+
+--- agent prompt ---
+Configure Claude Code on this machine to use my self-hosted Birks AI endpoint at https://ai.birks.dev. Set ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN, and the ANTHROPIC_DEFAULT_{OPUS,SONNET,HAIKU}_MODEL variables in my shell profile. Use the model "Qwen3-Coder-30B". Read the API key from the BIRKS_AI_API_KEY environment variable. Do not write the key itself into any file in a git repository, and do not print it. Preserve my existing unrelated configuration.

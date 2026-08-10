@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>{{block "title" .}}{{.Title}}{{end}} · {{.Brand.Name}}</title>
+{{/* The generated brand sheet must come first: app.css consumes its custom
+     properties. Both are same-origin, which keeps style-src 'self' viable. */}}
+<link rel="stylesheet" href="{{.Brand.StylesheetURL}}">
+<link rel="stylesheet" href="/static/app.css">
+{{if .Brand.FaviconURL}}<link rel="icon" href="{{.Brand.FaviconURL}}">{{end}}
+</head>
+<body>
+{{if .DevMode}}
+<p class="dev-banner" role="alert">
+  Development mode — sign-in is bypassed and no real identity is checked. Never expose this deployment.
+</p>
+{{end}}
+
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<header class="site-header">
+  <a class="brand" href="/">
+    {{if .Brand.HasLogo}}
+      <img class="brand-logo" src="{{.Brand.LogoURL}}" alt="{{.Brand.LogoAlt}}" height="28">
+    {{else}}
+      <span class="brand-wordmark">{{.Brand.Name}}</span>
+    {{end}}
+  </a>
+
+  {{if .User}}
+  <div class="account-chip">
+    <span class="account-name">{{.User.Name}}</span>
+    {{if .User.Email}}<span class="account-email">{{.User.Email}}</span>{{end}}
+    <form method="post" action="/logout">
+      <button type="submit" class="button button-quiet">Sign out</button>
+    </form>
+  </div>
+  {{end}}
+</header>
+
+{{template "flashes.html" .}}
+
+<main id="main" class="site-main">
+{{block "main" .}}{{end}}
+</main>
+
+<footer class="site-footer">
+  <p>{{.Brand.Tagline}}</p>
+  <p class="footer-meta">
+    {{if .Brand.SupportURL}}<a href="{{.Brand.SupportURL}}">Get help</a>
+    {{else if .Brand.SupportEmail}}<a href="mailto:{{.Brand.SupportEmail}}">Get help</a>{{end}}
+    {{if .RequestID}}<span class="request-id">Request {{.RequestID}}</span>{{end}}
+  </p>
+</footer>
+
+<script src="/static/app.js" defer></script>
+</body>
+</html>

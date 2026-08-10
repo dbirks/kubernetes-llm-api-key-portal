@@ -1,0 +1,18 @@
+{{define "title"}}{{.Heading}}{{end}}
+
+{{define "main"}}
+<section class="section narrow">
+  <h1>{{.Heading}}</h1>
+  <p class="lede">{{.Message}}</p>
+
+  <p class="form-actions">
+    <a class="button button-quiet" href="/">Go to the start</a>
+  </p>
+
+  {{if .RequestID}}
+  <p class="fine-print">
+    If you report this, include reference <code>{{.RequestID}}</code>.
+  </p>
+  {{end}}
+</section>
+{{end}}

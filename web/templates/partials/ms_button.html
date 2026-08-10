@@ -1,0 +1,19 @@
+{{define "ms_button.html"}}
+{{/*
+  Microsoft sign-in button.
+
+  Microsoft's branding guidelines require the four-square mark and the exact
+  wording "Sign in with Microsoft". Do not recolour the mark, substitute an
+  icon, or reword the label — BRAND_ACCENT deliberately does not apply here.
+  Everything around this button is freely brandable.
+*/}}
+<a class="ms-button" href="/login">
+  <svg class="ms-mark" width="20" height="20" viewBox="0 0 21 21" aria-hidden="true" focusable="false">
+    <rect x="1"  y="1"  width="9" height="9" fill="#f25022"/>
+    <rect x="11" y="1"  width="9" height="9" fill="#7fba00"/>
+    <rect x="1"  y="11" width="9" height="9" fill="#00a4ef"/>
+    <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+  </svg>
+  <span>Sign in with Microsoft</span>
+</a>
+{{end}}

@@ -1,0 +1,35 @@
+id: crush
+name: Crush
+
+Add Birks AI as an OpenAI-compatible provider in Crush.
+
+--- file ~/.config/crush/crush.json (json) ---
+{
+  "$schema": "https://charm.land/crush.json",
+  "providers": {
+    "birks-ai": {
+      "type": "openai-compat",
+      "base_url": "https://ai.birks.dev/v1",
+      "api_key": "$BIRKS_AI_API_KEY",
+      "models": [
+        {
+          "id": "Qwen3-Coder-30B",
+          "name": "Qwen3-Coder-30B"
+        }
+      ]
+    }
+  }
+}
+
+--- commands (bash) ---
+export BIRKS_AI_API_KEY="YOUR_API_KEY"
+
+crush
+
+--- notes ---
+- The $BIRKS_AI_API_KEY form tells Crush to expand the value from your environment.
+- The openai-compat provider type sends Authorization: Bearer, which is what the gateway expects.
+- Crush also supports an anthropic provider type; the OpenAI-compatible route is the tested one here.
+
+--- agent prompt ---
+Configure Crush on this machine to use my self-hosted Birks AI endpoint at https://ai.birks.dev. Add an openai-compat provider to my Crush config that expands the API key from an environment variable. Use the model "Qwen3-Coder-30B". Read the API key from the BIRKS_AI_API_KEY environment variable. Do not write the key itself into any file in a git repository, and do not print it. Preserve my existing unrelated configuration.

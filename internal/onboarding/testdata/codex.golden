@@ -1,0 +1,27 @@
+id: codex
+name: Codex
+
+Configure Birks AI as a custom model provider for Codex, over the OpenAI Responses API.
+
+--- file ~/.codex/config.toml (toml) ---
+model = "Qwen3-Coder-30B"
+model_provider = "birks-ai"
+
+[model_providers.birks-ai]
+name = "Birks AI"
+base_url = "https://ai.birks.dev/v1"
+env_key = "BIRKS_AI_API_KEY"
+wire_api = "responses"
+
+--- commands (bash) ---
+export BIRKS_AI_API_KEY="YOUR_API_KEY"
+
+codex
+
+--- notes ---
+- env_key names the environment variable Codex reads the credential from.
+- Custom Codex providers use the Responses wire format, which the endpoint serves at /v1/responses.
+- If you already have a config.toml, merge these keys instead of overwriting it.
+
+--- agent prompt ---
+Configure Codex on this machine to use my self-hosted Birks AI endpoint at https://ai.birks.dev. Add a [model_providers.*] section to ~/.codex/config.toml with wire_api = "responses" and env_key pointing at my environment variable, preserving my existing settings. Use the model "Qwen3-Coder-30B". Read the API key from the BIRKS_AI_API_KEY environment variable. Do not write the key itself into any file in a git repository, and do not print it. Preserve my existing unrelated configuration.

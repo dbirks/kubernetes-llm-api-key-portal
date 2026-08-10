@@ -1,0 +1,66 @@
+{{define "guides.html"}}
+{{/*
+  Client setup instructions.
+
+  Rendered as a plain list of <details> so the page is fully usable without
+  JavaScript. app.js may upgrade this into a tab strip; if it does, it must keep
+  every panel reachable by keyboard and must not remove content from the DOM.
+
+  Copy buttons are wired by id pairs only. A snippet may contain the credential,
+  so its text lives in the <pre> body and never in an attribute.
+*/}}
+<div class="guides" data-guides>
+  <ul class="guide-tabs" role="list" data-guide-tabs hidden>
+    {{range .Guides}}
+    <li><button type="button" class="guide-tab" data-guide-target="guide-{{.ID}}">{{.Name}}</button></li>
+    {{end}}
+  </ul>
+
+  {{range .Guides}}
+  {{$guide := .}}
+  <details class="guide" id="guide-{{.ID}}" data-guide-panel>
+    <summary class="guide-summary">{{.Name}}</summary>
+
+    <p class="guide-description">{{.Description}}</p>
+
+    {{range $i, $file := .Files}}
+    <figure class="snippet">
+      <figcaption>
+        <code class="snippet-path">{{$file.Path}}</code>
+        <button type="button" class="button button-quiet copy-button" data-copy-target="{{$guide.ID}}-file-{{$i}}">Copy</button>
+      </figcaption>
+      <pre class="snippet-body" id="{{$guide.ID}}-file-{{$i}}"><code>{{$file.Content}}</code></pre>
+    </figure>
+    {{end}}
+
+    {{range $i, $block := .Commands}}
+    <figure class="snippet">
+      <figcaption>
+        <span class="snippet-path">Shell</span>
+        <button type="button" class="button button-quiet copy-button" data-copy-target="{{$guide.ID}}-cmd-{{$i}}">Copy</button>
+      </figcaption>
+      <pre class="snippet-body" id="{{$guide.ID}}-cmd-{{$i}}"><code>{{$block.Content}}</code></pre>
+    </figure>
+    {{end}}
+
+    {{if .Notes}}
+    <ul class="guide-notes">
+      {{range .Notes}}<li>{{.}}</li>{{end}}
+    </ul>
+    {{end}}
+
+    <details class="agent-prompt">
+      <summary>Let another coding agent set this up</summary>
+      <p class="guide-description">Paste this into a coding agent already running on your machine.</p>
+      <figure class="snippet">
+        <figcaption>
+          <span class="snippet-path">Prompt</span>
+          <button type="button" class="button button-quiet copy-button" data-copy-target="{{$guide.ID}}-prompt">Copy</button>
+        </figcaption>
+        <pre class="snippet-body" id="{{$guide.ID}}-prompt"><code>{{$guide.AgentPrompt}}</code></pre>
+      </figure>
+    </details>
+  </details>
+  {{end}}
+</div>
+{{end}}

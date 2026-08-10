@@ -1,0 +1,36 @@
+{{define "title"}}Create API key{{end}}
+
+{{define "main"}}
+<section class="section narrow">
+  <h1>Create API key</h1>
+
+  <form method="post" action="/keys" class="form">
+    <div class="field">
+      <label for="name">Name this key</label>
+      <input
+        type="text"
+        id="name"
+        name="name"
+        value="{{.Name}}"
+        maxlength="64"
+        required
+        autocomplete="off"
+        autofocus
+        {{if .NameError}}aria-invalid="true" aria-describedby="name-error"{{else}}aria-describedby="name-help"{{end}}>
+      {{if .NameError}}
+      <p class="field-error" id="name-error"><strong>Error:</strong> {{.NameError}}</p>
+      {{else}}
+      <p class="field-help" id="name-help">
+        Use a name that helps you remember where the key is stored, like
+        “MacBook Claude Code”.
+      </p>
+      {{end}}
+    </div>
+
+    <div class="form-actions">
+      <a class="button button-quiet" href="/account">Cancel</a>
+      <button type="submit" class="button button-primary">Create key</button>
+    </div>
+  </form>
+</section>
+{{end}}

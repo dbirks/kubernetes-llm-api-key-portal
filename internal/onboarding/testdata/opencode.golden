@@ -1,0 +1,37 @@
+id: opencode
+name: OpenCode
+
+Add Birks AI as a custom OpenAI-compatible provider in OpenCode's config.
+
+--- file ~/.config/opencode/opencode.json (json) ---
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "birks-ai": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Birks AI",
+      "options": {
+        "baseURL": "https://ai.birks.dev/v1",
+        "apiKey": "{env:BIRKS_AI_API_KEY}"
+      },
+      "models": {
+        "Qwen3-Coder-30B": {
+          "name": "Qwen3-Coder-30B"
+        }
+      }
+    }
+  }
+}
+
+--- commands (bash) ---
+export BIRKS_AI_API_KEY="YOUR_API_KEY"
+
+opencode
+
+--- notes ---
+- The {env:BIRKS_AI_API_KEY} placeholder reads the credential from your environment at run time.
+- OpenCode's provider schema has changed across releases. If this does not load, check the current docs at opencode.ai and report it so the snippet can be updated.
+- A project-local opencode.json overrides the global one, which is useful for trying this on a single repository first.
+
+--- agent prompt ---
+Configure OpenCode on this machine to use my self-hosted Birks AI endpoint at https://ai.birks.dev. Add a custom openai-compatible provider to my OpenCode config, reading the API key from the environment rather than hardcoding it. Use the model "Qwen3-Coder-30B". Read the API key from the BIRKS_AI_API_KEY environment variable. Do not write the key itself into any file in a git repository, and do not print it. Preserve my existing unrelated configuration.

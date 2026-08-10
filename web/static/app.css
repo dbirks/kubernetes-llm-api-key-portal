@@ -1,0 +1,303 @@
+/*
+ * Baseline stylesheet.
+ *
+ * This is a structural placeholder: correct, legible, and accessible, but not
+ * the final visual design. It is expected to be replaced wholesale.
+ *
+ * Two rules survive any redesign:
+ *   1. Reference the brand custom properties with a literal fallback, so the
+ *      page still renders if the generated brand sheet fails to load.
+ *   2. No @import, no remote fonts, no remote images. The Content-Security-
+ *      Policy is first-party only.
+ */
+
+:root {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  --bg: #ffffff;
+  --surface: #f7f7f8;
+  --border: #e2e2e5;
+  --text: #17171b;
+  --text-muted: #5c5c66;
+  --danger: #b3261e;
+  --warning-bg: #fff8e6;
+  --warning-border: #e8c46a;
+
+  --radius: 8px;
+  --measure: 42rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121216;
+    --surface: #1c1c22;
+    --border: #2e2e37;
+    --text: #ececf0;
+    --text-muted: #a1a1ad;
+    --danger: #f2b8b5;
+    --warning-bg: #2a2312;
+    --warning-border: #6b5a24;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-text-size-adjust: 100%;
+}
+
+h1, h2, h3 { line-height: 1.25; margin: 0 0 0.5rem; }
+h1 { font-size: 1.5rem; }
+h2 { font-size: 1.15rem; }
+p { margin: 0 0 0.75rem; }
+code, pre { font-family: var(--font-mono); font-size: 0.9em; }
+
+a { color: var(--brand-accent, #4f46e5); }
+
+/* Visible focus is non-negotiable: keyboard users need to see where they are. */
+:focus-visible {
+  outline: 2px solid var(--brand-accent, #4f46e5);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+}
+.skip-link:focus {
+  left: 1rem;
+  top: 1rem;
+  z-index: 10;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.dev-banner {
+  margin: 0;
+  padding: 0.6rem 1rem;
+  background: var(--danger);
+  color: #fff;
+  font-weight: 600;
+  text-align: center;
+}
+
+.site-header,
+.site-main,
+.site-footer,
+.flashes {
+  max-width: 60rem;
+  margin-inline: auto;
+  padding-inline: 1.25rem;
+}
+
+.site-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding-block: 1.25rem;
+}
+
+.brand { display: inline-flex; align-items: center; text-decoration: none; color: inherit; }
+.brand-logo { display: block; height: 28px; width: auto; max-width: 220px; }
+.brand-wordmark { font-weight: 650; font-size: 1.05rem; letter-spacing: -0.01em; }
+
+.account-chip { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.account-name { font-weight: 550; }
+.account-email { color: var(--text-muted); font-size: 0.9rem; }
+
+.site-main { padding-block: 1rem 3rem; }
+.section { margin-block: 0 2.75rem; }
+.section.narrow { max-width: var(--measure); }
+
+.section-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.lede { font-size: 1.05rem; color: var(--text-muted); }
+.fine-print { font-size: 0.875rem; color: var(--text-muted); }
+
+/* Buttons and links styled as buttons share one look, but a button that acts
+   is a <button> and a button that navigates is an <a>. */
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-weight: 550;
+  text-decoration: none;
+  cursor: pointer;
+}
+.button:hover { background: var(--surface); }
+
+.button-primary {
+  background: var(--brand-accent, #4f46e5);
+  border-color: var(--brand-accent, #4f46e5);
+  color: var(--brand-accent-fg, #ffffff);
+}
+.button-primary:hover {
+  background: var(--brand-accent-hover, #4338ca);
+  border-color: var(--brand-accent-hover, #4338ca);
+}
+
+.button-danger { color: var(--danger); border-color: var(--danger); }
+.button-quiet { background: transparent; }
+
+.ms-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  font-weight: 550;
+  text-decoration: none;
+}
+.ms-button:hover { background: var(--surface); }
+.ms-mark { flex: none; }
+
+.flashes { padding-block: 0.25rem; }
+.flash {
+  margin: 0 0 0.5rem;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.flash-label { font-weight: 650; }
+.flash-success { border-left-color: var(--brand-accent, #4f46e5); }
+.flash-error { border-left-color: var(--danger); }
+
+.key-list { list-style: none; margin: 0; padding: 0; }
+.key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.9rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.key-name { font-size: 1rem; margin: 0; }
+.key-meta { margin: 0; color: var(--text-muted); font-size: 0.9rem; }
+
+.empty {
+  padding: 1.5rem;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.form { max-width: var(--measure); }
+.field { margin-bottom: 1.25rem; }
+.field label { display: block; font-weight: 550; margin-bottom: 0.35rem; }
+.field input {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.field input[aria-invalid="true"] { border-color: var(--danger); }
+.field-help { margin: 0.35rem 0 0; font-size: 0.875rem; color: var(--text-muted); }
+.field-error { margin: 0.35rem 0 0; font-size: 0.9rem; color: var(--danger); }
+
+.form-actions { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+
+.callout {
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.callout p:last-child { margin-bottom: 0; }
+.callout-warning { background: var(--warning-bg); border-color: var(--warning-border); }
+
+.snippet {
+  margin: 0 0 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface);
+}
+.snippet figcaption {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.45rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+.snippet-path { color: var(--text-muted); font-size: 0.85rem; }
+.snippet-body {
+  margin: 0;
+  padding: 0.85rem;
+  /* Long snippets scroll inside their own box; the page never scrolls sideways. */
+  overflow-x: auto;
+}
+.snippet-secret .snippet-body { font-size: 1rem; word-break: break-all; white-space: pre-wrap; }
+
+.guides { margin-top: 1rem; }
+.guide-tabs { display: flex; flex-wrap: wrap; gap: 0.4rem; list-style: none; margin: 0 0 1rem; padding: 0; }
+.guide-tab {
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.guide-tab[aria-selected="true"] {
+  background: var(--brand-accent-subtle, #eef2ff);
+  border-color: var(--brand-accent, #4f46e5);
+}
+
+.guide { border-bottom: 1px solid var(--border); padding-block: 0.75rem; }
+.guide-summary { cursor: pointer; font-weight: 600; }
+.guide-description { color: var(--text-muted); }
+.guide-notes { color: var(--text-muted); font-size: 0.9rem; }
+.agent-prompt summary { cursor: pointer; color: var(--text-muted); font-size: 0.9rem; }
+
+.copy-button[data-copied="true"]::after { content: " ✓"; }
+
+.site-footer {
+  padding-block: 1.5rem 2.5rem;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+.footer-meta { display: flex; gap: 1rem; flex-wrap: wrap; }
+.request-id { font-family: var(--font-mono); }
+
+@media (max-width: 30rem) {
+  .section-head, .key { flex-direction: column; align-items: flex-start; }
+}
