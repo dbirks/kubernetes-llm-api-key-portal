@@ -941,7 +941,7 @@ hr {
 }
 .secret .button { flex: none; height: 31px; }
 
-.created-warning {
+.created-note {
   margin: 12px 0 16px;
   max-width: 600px;
   font-size: 12.5px;
