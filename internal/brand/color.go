@@ -17,8 +17,7 @@ var (
 	fgDark  = RGB{0x10, 0x10, 0x1A}
 
 	// Surface colors the derived tints are mixed against.
-	surfaceLight = RGB{0xFF, 0xFF, 0xFF}
-	surfaceDark  = RGB{0x12, 0x12, 0x16}
+	surfaceDark = RGB{0x12, 0x12, 0x16}
 )
 
 // minContrast is the WCAG AA ratio for normal text.
@@ -96,10 +95,10 @@ func mix(a, b RGB, t float64) RGB {
 
 // mixGamma blends two colors in plain sRGB space.
 //
-// Used for the subtle tint only. Mixing heavily toward white in linear light is
-// luminance-correct but strips almost all of the hue, turning a green accent
-// into grey. Gamma-space mixing keeps a recognisable tint, which is the entire
-// point of that token.
+// Used for both derived tints. Mixing toward white or toward the surface in
+// linear light is luminance-correct but strips hue, turning a green accent
+// grey and a blue one slate. Designers pick these values by eye in sRGB, so
+// blending the same way is what reproduces what they drew.
 func mixGamma(a, b RGB, t float64) RGB {
 	blend := func(x, y uint8) uint8 {
 		return uint8(math.Round(float64(x)*(1-t) + float64(y)*t))
@@ -130,21 +129,7 @@ type Palette struct {
 	Contrast float64
 }
 
-// lightPalette derives the light-scheme colors from the operator's accent.
-// Hover darkens slightly; the subtle tint is a heavy wash toward the surface,
-// suitable as a callout background.
-func lightPalette(accent RGB) Palette {
-	fg, ratio := bestForeground(accent)
-	return Palette{
-		Accent:      accent,
-		AccentHover: mix(accent, fgDark, 0.18),
-		AccentFg:    fg,
-		Subtle:      mixGamma(accent, surfaceLight, 0.90),
-		Contrast:    ratio,
-	}
-}
-
-// darkPalette derives the dark-scheme colors. A brand color chosen for white
+// darkPalette derives the portal's colors. A brand color chosen for white
 // backgrounds is usually too dark on a dark surface, so when the operator has
 // not supplied an explicit dark accent we lighten theirs until it clears AA
 // against the dark surface. Giving up after a bounded number of steps keeps a
@@ -157,10 +142,14 @@ func darkPalette(accent RGB, explicit bool) Palette {
 	}
 	fg, ratio := bestForeground(accent)
 	return Palette{
-		Accent:      accent,
-		AccentHover: mix(accent, fgLight, 0.18),
+		Accent: accent,
+		// 0.18 toward white for hover, 0.66 toward the surface for the subtle
+		// tint. The tint stops well short of the surface on purpose: past about
+		// three quarters it reads as a neutral panel rather than as an accent,
+		// which defeats the token.
+		AccentHover: mixGamma(accent, fgLight, 0.18),
 		AccentFg:    fg,
-		Subtle:      mixGamma(accent, surfaceDark, 0.82),
+		Subtle:      mixGamma(accent, surfaceDark, 0.66),
 		Contrast:    ratio,
 	}
 }

@@ -117,19 +117,15 @@ func Resolve(cfg config.BrandConfig, log *slog.Logger) (*Brand, error) {
 		explicitDark = true
 	}
 
-	light := lightPalette(accent)
-	dark := darkPalette(darkAccent, explicitDark)
-	for scheme, p := range map[string]Palette{"light": light, "dark": dark} {
-		if p.Contrast < minContrast {
-			log.Warn("brand accent has low text contrast; buttons using it may be hard to read",
-				"scheme", scheme,
-				"accent", p.Accent.Hex(),
-				"contrast_ratio", fmt.Sprintf("%.2f", p.Contrast),
-				"recommended_minimum", minContrast)
-		}
+	palette := darkPalette(darkAccent, explicitDark)
+	if palette.Contrast < minContrast {
+		log.Warn("brand accent has low text contrast; buttons using it may be hard to read",
+			"accent", palette.Accent.Hex(),
+			"contrast_ratio", fmt.Sprintf("%.2f", palette.Contrast),
+			"recommended_minimum", minContrast)
 	}
 
-	b.stylesheet = []byte(renderCSS(light, dark))
+	b.stylesheet = []byte(renderCSS(palette))
 	sum := sha256.Sum256(b.stylesheet)
 	b.StylesheetURL = cssURLPrefix + hex.EncodeToString(sum[:])[:12] + ".css"
 	return b, nil
@@ -137,20 +133,20 @@ func Resolve(cfg config.BrandConfig, log *slog.Logger) (*Brand, error) {
 
 // renderCSS emits only custom properties. All values are derived from validated
 // hex colors, so nothing operator-supplied reaches the stylesheet as free text.
-func renderCSS(light, dark Palette) string {
+//
+// One palette, at bare :root, with no prefers-color-scheme query. The portal is
+// dark-only and declares `color-scheme: dark`, so publishing a light palette as
+// the default would hand light-scheme accents to every visitor whose operating
+// system is set to light — on a page that is dark regardless.
+func renderCSS(p Palette) string {
 	var sb strings.Builder
 	sb.WriteString("/* generated at startup from BRAND_ACCENT; do not edit */\n")
-	writeVars := func(indent string, p Palette) {
-		fmt.Fprintf(&sb, "%s--brand-accent: %s;\n", indent, p.Accent.Hex())
-		fmt.Fprintf(&sb, "%s--brand-accent-hover: %s;\n", indent, p.AccentHover.Hex())
-		fmt.Fprintf(&sb, "%s--brand-accent-fg: %s;\n", indent, p.AccentFg.Hex())
-		fmt.Fprintf(&sb, "%s--brand-accent-subtle: %s;\n", indent, p.Subtle.Hex())
-	}
 	sb.WriteString(":root {\n")
-	writeVars("  ", light)
-	sb.WriteString("}\n\n@media (prefers-color-scheme: dark) {\n  :root {\n")
-	writeVars("    ", dark)
-	sb.WriteString("  }\n}\n")
+	fmt.Fprintf(&sb, "  --brand-accent: %s;\n", p.Accent.Hex())
+	fmt.Fprintf(&sb, "  --brand-accent-hover: %s;\n", p.AccentHover.Hex())
+	fmt.Fprintf(&sb, "  --brand-accent-fg: %s;\n", p.AccentFg.Hex())
+	fmt.Fprintf(&sb, "  --brand-accent-subtle: %s;\n", p.Subtle.Hex())
+	sb.WriteString("}\n")
 	return sb.String()
 }
 

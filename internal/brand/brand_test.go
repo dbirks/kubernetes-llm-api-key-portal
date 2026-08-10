@@ -67,11 +67,17 @@ func TestResolveDefaults(t *testing.T) {
 	css := string(b.Stylesheet())
 	for _, want := range []string{
 		"--brand-accent:", "--brand-accent-hover:", "--brand-accent-fg:", "--brand-accent-subtle:",
-		"prefers-color-scheme: dark",
 	} {
 		if !strings.Contains(css, want) {
 			t.Errorf("generated stylesheet is missing %q", want)
 		}
+	}
+
+	// The portal is dark-only. A prefers-color-scheme query here would mean the
+	// properties at bare :root are the light palette, which is what every
+	// light-mode visitor would then get on a permanently dark page.
+	if strings.Contains(css, "prefers-color-scheme") {
+		t.Errorf("generated stylesheet still branches on color scheme:\n%s", css)
 	}
 }
 
@@ -121,8 +127,12 @@ func TestAccentForegroundMeetsContrast(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ParseHex: %v", err)
 		}
-		fg, ratio := bestForeground(parsed)
-		if ratio < Contrast(parsed, fgLight) && ratio < Contrast(parsed, fgDark) {
+		// The foreground must pair with the accent the stylesheet actually
+		// publishes, not with the operator's input: a dark accent is lightened
+		// first, and that can flip which foreground wins.
+		published := darkPalette(parsed, false).Accent
+		fg, ratio := bestForeground(published)
+		if ratio < Contrast(published, fgLight) && ratio < Contrast(published, fgDark) {
 			t.Errorf("accent %s: chose the worse foreground", accent)
 		}
 		if !strings.Contains(string(b.Stylesheet()), fg.Hex()) {
@@ -133,17 +143,40 @@ func TestAccentForegroundMeetsContrast(t *testing.T) {
 
 // A low-contrast brand colour is the operator's decision, so it warns rather
 // than blocking startup.
+//
+// The accent has to be supplied as an explicit dark accent to reach the
+// warning. A derived one cannot: darkPalette lightens until the accent clears
+// 4.5:1 against the dark surface, and fgDark is within a hair of that surface,
+// so anything that survives the loop already has a legible foreground. Only an
+// operator overriding the derivation can produce an illegible pair.
 func TestLowContrastAccentWarnsButSucceeds(t *testing.T) {
 	log, buf := capturingLogger()
 	cfg := baseConfig()
 	// A mid grey sitting in the narrow band where neither near-white nor
 	// near-black text clears 4.5:1.
-	cfg.Accent = "#797979"
+	cfg.AccentDark = "#797979"
 	if _, err := Resolve(cfg, log); err != nil {
 		t.Fatalf("Resolve should not fail on a low-contrast accent: %v", err)
 	}
 	if !strings.Contains(buf.String(), "low text contrast") {
 		t.Errorf("expected a contrast warning, got:\n%s", buf.String())
+	}
+}
+
+// The counterpart to the above: an accent left to the derivation never trips
+// the warning, because the lightening loop guarantees a legible foreground.
+// This pins that guarantee so a change to the loop cannot quietly remove it.
+func TestDerivedAccentNeverWarns(t *testing.T) {
+	for _, accent := range []string{"#797979", "#000000", "#101820", "#ffe600"} {
+		log, buf := capturingLogger()
+		cfg := baseConfig()
+		cfg.Accent = accent
+		if _, err := Resolve(cfg, log); err != nil {
+			t.Fatalf("Resolve(%s): %v", accent, err)
+		}
+		if strings.Contains(buf.String(), "low text contrast") {
+			t.Errorf("accent %s: derived palette warned about contrast:\n%s", accent, buf.String())
+		}
 	}
 }
 
