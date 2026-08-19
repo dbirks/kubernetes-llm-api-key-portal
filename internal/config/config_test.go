@@ -15,6 +15,7 @@ func setEnv(t *testing.T, env map[string]string) {
 		"ENTRA_TENANT_ID", "ENTRA_CLIENT_ID", "ENTRA_CLIENT_SECRET", "ENTRA_AVATARS",
 		"SESSION_KEY", "KEYSTORE_MODE", "KUBERNETES_NAMESPACE",
 		"KUBERNETES_ALLOW_KUBECONFIG", "KUBECONFIG",
+		"MODELS_NAMESPACE", "MODELS_LABEL_SELECTOR",
 		"API_KEY_PREFIX", "DEFAULT_MODEL", "INFERENCE_BASE_URL", "DEV_FAKE_AUTH",
 		"BRAND_NAME", "BRAND_SHORT_NAME", "BRAND_ORG_NAME", "BRAND_TAGLINE", "BRAND_LOGO_FILE",
 		"BRAND_LOGO_ALT", "BRAND_FAVICON_FILE", "BRAND_ACCENT", "BRAND_ACCENT_DARK",
@@ -384,5 +385,32 @@ func TestBrandOrgNameDefaultAndOverride(t *testing.T) {
 	}
 	if cfg.Brand.OrgName != "Acme Corp" {
 		t.Errorf("OrgName = %q, want Acme Corp", cfg.Brand.OrgName)
+	}
+}
+
+func TestModelsCatalogConfig(t *testing.T) {
+	// Off by default: no namespace means the feature is disabled.
+	setEnv(t, productionEnv())
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.ModelsNamespace != "" || cfg.ModelsSelector != "" {
+		t.Errorf("catalog config = (%q, %q), want both empty by default", cfg.ModelsNamespace, cfg.ModelsSelector)
+	}
+
+	env := productionEnv()
+	env["MODELS_NAMESPACE"] = "default"
+	env["MODELS_LABEL_SELECTOR"] = "tier=public"
+	setEnv(t, env)
+	cfg, err = Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.ModelsNamespace != "default" {
+		t.Errorf("ModelsNamespace = %q, want default", cfg.ModelsNamespace)
+	}
+	if cfg.ModelsSelector != "tier=public" {
+		t.Errorf("ModelsSelector = %q, want tier=public", cfg.ModelsSelector)
 	}
 }

@@ -72,7 +72,7 @@
       <div class="lane-grid lane-grid-fast">
         <div class="node node-accent">
           <span class="node-name">Your coding agent</span>
-          <span class="node-sub">Bearer &lt;key&gt;</span>
+          <span class="node-sub">Bearer &lt;key&gt; · model: …</span>
         </div>
         <div class="conn"><span class="conn-line" aria-hidden="true"></span></div>
         <div class="node node-accent">
@@ -86,11 +86,20 @@
         </div>
         <div class="conn"><span class="conn-line" aria-hidden="true"></span></div>
         <div class="node node-accent">
-          <span class="node-name">vLLM</span>
-          <span class="node-sub">runs the request</span>
+          <span class="node-name">Envoy AI Gateway</span>
+          <span class="node-sub">routes by model name</span>
+        </div>
+        <div class="conn"><span class="conn-line" aria-hidden="true"></span></div>
+        <div class="node node-accent">
+          <span class="node-name">KServe / llm-d</span>
+          <span class="node-sub">loads on demand, runs it</span>
         </div>
       </div>
     </div>
+    <p class="hiw-cold">
+      Models scale to zero when idle, so the first request to a cold model waits
+      while it loads; later requests are warm. See <a href="/models">the model list</a>.
+    </p>
   </section>
 
   <div class="hiw-foot">
@@ -108,7 +117,8 @@
       <h2 class="eyebrow">Worth knowing</h2>
       <ul class="hiw-list">
         <li>Revoking deletes the Secret, so the key stops at kgateway.</li>
-        <li>The same key works for every supported client.</li>
+        <li>The same key works for every supported client and every model.</li>
+        <li>Choose a model with the <code>model</code> field; the gateway routes by that name.</li>
         <li>Nothing you prompt is stored by this portal.</li>
       </ul>
     </section>

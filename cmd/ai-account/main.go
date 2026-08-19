@@ -27,8 +27,11 @@ import (
 	"github.com/dbirks/kubernetes-llm-api-key-portal/internal/keystore"
 	k8sstore "github.com/dbirks/kubernetes-llm-api-key-portal/internal/keystore/kubernetes"
 	"github.com/dbirks/kubernetes-llm-api-key-portal/internal/keystore/memory"
+	"github.com/dbirks/kubernetes-llm-api-key-portal/internal/models"
 	"github.com/dbirks/kubernetes-llm-api-key-portal/internal/onboarding"
 	"github.com/dbirks/kubernetes-llm-api-key-portal/web"
+
+	"k8s.io/client-go/dynamic"
 )
 
 // Server timeouts. Generous enough for a slow mobile connection, tight enough
@@ -86,6 +89,11 @@ func run() error {
 		return err
 	}
 
+	catalog, err := buildCatalog(cfg, log)
+	if err != nil {
+		return err
+	}
+
 	// Built before the auth provider because the provider writes to it during
 	// the callback, and read by the web layer when rendering the header. Nil
 	// when avatars are off, which both drops the Graph scope and makes every
@@ -109,6 +117,7 @@ func run() error {
 		Log:             log,
 		Brand:           brandData,
 		Store:           store,
+		Models:          catalog,
 		Sealer:          sealer,
 		Auth:            authProvider,
 		Assets:          assets,
@@ -160,6 +169,45 @@ func buildKeyStore(cfg *config.Config, log *slog.Logger) (keystore.KeyStore, err
 		}
 		return store, nil
 	}
+}
+
+// buildCatalog wires up the read-only model catalog behind GET /models.
+//
+// It returns a nil interface — feature off — unless the keystore is Kubernetes
+// and MODELS_NAMESPACE is set. The dev/memory mode has no cluster to read, so
+// the nav link stays hidden and the page shows its disabled state. Returning an
+// explicit nil rather than a typed nil *models.Store matters: a typed nil in an
+// interface reads as non-nil, which would light up the nav for a catalog that
+// cannot answer.
+func buildCatalog(cfg *config.Config, log *slog.Logger) (models.Catalog, error) {
+	if cfg.KeystoreMode != config.KeystoreKubernetes || cfg.ModelsNamespace == "" {
+		return nil, nil
+	}
+
+	restCfg, err := k8sstore.RESTConfig(k8sstore.ClientOptions{
+		Kubeconfig:      cfg.KubernetesKubeconfig,
+		AllowKubeconfig: cfg.KubernetesAllowKubecfg,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("model catalog: %w", err)
+	}
+	dyn, err := dynamic.NewForConfig(restCfg)
+	if err != nil {
+		return nil, fmt.Errorf("model catalog: build dynamic client: %w", err)
+	}
+	catalog, err := models.New(models.Options{
+		Client:    dyn,
+		Namespace: cfg.ModelsNamespace,
+		Selector:  cfg.ModelsSelector,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("model catalog: %w", err)
+	}
+	log.Info("model catalog enabled",
+		"namespace", cfg.ModelsNamespace,
+		"selector", cfg.ModelsSelector,
+		"resource", models.GVR.String())
+	return catalog, nil
 }
 
 // seedDevKeys gives the development account page something to render, so UI

@@ -24,10 +24,14 @@
 
   <p class="landing-copy">
     Create an API key and connect Claude Code, Pi, OpenCode, Codex, or Crush.
+    One key reaches every model — Qwen3.8-27B, Muse-Glimmer-30B, and more.
   </p>
 
   {{template "ms_button.html" .}}
 
-  <p class="landing-note">Inference runs on self-hosted hardware.</p>
+  <p class="landing-note">
+    Inference runs on self-hosted hardware. Models load on demand, so the first
+    request to an idle one warms up before it answers.
+  </p>
 </div>
 {{end}}

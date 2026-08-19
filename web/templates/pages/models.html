@@ -1,0 +1,51 @@
+{{define "title"}}Models{{end}}
+
+{{define "main"}}
+<div class="panel">
+  {{if .Enabled}}
+    {{if .Models}}
+    <div class="models">
+      <div class="rail-head">
+        <h1 class="eyebrow">Models</h1>
+        <span class="rail-count">{{len .Models}}</span>
+      </div>
+
+      <p class="models-lede">
+        Set the <code>model</code> field to one of these names. The first request
+        to an idle model cold-starts while it loads on demand.
+      </p>
+
+      <ul class="model-list" role="list">
+        {{range .Models}}
+        <li class="model-row">
+          <div class="model-headings">
+            <span class="model-name">{{.DisplayName}}</span>
+            <code class="model-id">{{.Name}}</code>
+          </div>
+          <span class="pill {{.StatusClass}}"><span class="pill-dot" aria-hidden="true"></span>{{.StatusLabel}}</span>
+        </li>
+        {{end}}
+      </ul>
+
+      <p class="fine-print">
+        The status is a hint read from the cluster, not from your key — this page
+        never calls the inference endpoint. More models are being added over time.
+      </p>
+    </div>
+    {{else}}
+    <div class="empty-state">
+      <h1 class="empty-title">No models are published yet.</h1>
+      <p class="empty-body">The catalog is empty right now. Check back shortly.</p>
+    </div>
+    {{end}}
+  {{else}}
+  <div class="empty-state">
+    <h1 class="empty-title">The model list isn't available here.</h1>
+    <p class="empty-body">
+      This deployment doesn't expose the catalog. Set the <code>model</code>
+      field to a name the service owner gave you.
+    </p>
+  </div>
+  {{end}}
+</div>
+{{end}}

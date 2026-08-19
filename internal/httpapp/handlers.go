@@ -20,6 +20,7 @@ func (a *App) page(w http.ResponseWriter, r *http.Request, title string) Page {
 		Title:     title,
 		RequestID: RequestIDFrom(r.Context()),
 		DevMode:   a.devMode,
+		Models:    a.catalog != nil,
 		Flashes:   a.sealer.TakeFlash(w, r),
 	}
 	if u, ok := auth.UserFrom(r.Context()); ok {
@@ -103,6 +104,40 @@ func (a *App) handleLanding(w http.ResponseWriter, r *http.Request) {
 	}
 	a.mustRender(w, r, http.StatusOK, "landing.html", LandingPage{
 		Page: a.page(w, r, a.brand.Name),
+	})
+}
+
+// handleModels serves the public model catalog.
+//
+// It reads the catalog from the cluster rather than the auth-gated /v1/models,
+// because the portal deliberately holds no API key. It is readable signed in or
+// out: which models exist is not per-user data.
+func (a *App) handleModels(w http.ResponseWriter, r *http.Request) {
+	page := a.page(w, r, "Models").withNav("models")
+
+	// Feature off: render the disabled state rather than a 404, so a link that
+	// was shared while the feature was on still explains itself.
+	if a.catalog == nil {
+		a.mustRender(w, r, http.StatusOK, "models.html", ModelsPage{Page: page})
+		return
+	}
+
+	list, err := a.catalog.List(r.Context())
+	if err != nil {
+		// The detail goes to the log; the page says nothing changed, because
+		// nothing did — this route reads, it never writes.
+		a.log.Error("listing models failed",
+			"request_id", RequestIDFrom(r.Context()), "error", err)
+		a.renderError(w, r, http.StatusServiceUnavailable,
+			"We couldn't load the model list",
+			"Nothing changed. Try again in a moment.")
+		return
+	}
+
+	a.mustRender(w, r, http.StatusOK, "models.html", ModelsPage{
+		Page:    page,
+		Models:  toModelViews(list),
+		Enabled: true,
 	})
 }
 

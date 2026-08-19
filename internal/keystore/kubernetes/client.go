@@ -24,13 +24,18 @@ type ClientOptions struct {
 	AllowKubeconfig bool
 }
 
-// NewClient builds a Kubernetes clientset.
+// RESTConfig resolves the Kubernetes client configuration.
 //
 // In-cluster configuration is always preferred. Falling back to a kubeconfig
 // requires an explicit opt-in, so the failure mode for a misconfigured
 // deployment is a refusal to start rather than silently talking to the wrong
 // cluster.
-func NewClient(opts ClientOptions) (kubernetes.Interface, error) {
+//
+// It is exported so other clients built against the same cluster — the
+// read-only model catalog's dynamic client, for one — resolve their connection
+// exactly as the keystore does, from one place, rather than re-implementing the
+// in-cluster/kubeconfig decision and drifting from it.
+func RESTConfig(opts ClientOptions) (*rest.Config, error) {
 	cfg, err := rest.InClusterConfig()
 	switch {
 	case err == nil:
@@ -39,7 +44,7 @@ func NewClient(opts ClientOptions) (kubernetes.Interface, error) {
 		if !opts.AllowKubeconfig {
 			return nil, errors.New(
 				"not running in a cluster and KUBERNETES_ALLOW_KUBECONFIG is not set; " +
-					"refusing to guess which cluster to write Secrets to")
+					"refusing to guess which cluster to talk to")
 		}
 		cfg, err = kubeconfigREST(opts.Kubeconfig)
 		if err != nil {
@@ -53,7 +58,15 @@ func NewClient(opts ClientOptions) (kubernetes.Interface, error) {
 	cfg.UserAgent = "ai-account"
 	cfg.QPS = 20
 	cfg.Burst = 40
+	return cfg, nil
+}
 
+// NewClient builds a Kubernetes clientset.
+func NewClient(opts ClientOptions) (kubernetes.Interface, error) {
+	cfg, err := RESTConfig(opts)
+	if err != nil {
+		return nil, err
+	}
 	client, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("build kubernetes client: %w", err)
