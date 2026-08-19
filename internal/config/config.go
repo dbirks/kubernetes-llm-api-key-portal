@@ -51,7 +51,22 @@ type Config struct {
 	KubernetesAllowKubecfg bool
 	KubernetesKubeconfig   string
 
-	APIKeyPrefix     string
+	// ModelsNamespace holds the KServe LLMInferenceService objects the /models
+	// page lists. Empty turns the feature off: the nav link is hidden and the
+	// page renders a disabled state. The catalog is read-only and independent
+	// of the keystore namespace, though they are often the same.
+	ModelsNamespace string
+
+	// ModelsSelector is an optional label selector narrowing the catalog to a
+	// curated subset of the models in ModelsNamespace. Empty lists them all.
+	ModelsSelector string
+
+	APIKeyPrefix string
+
+	// DefaultModel is the recommended model prefilled into the generated setup
+	// snippets. It is a convenience, not a restriction: a client may set the
+	// OpenAI "model" field to any name the gateway routes — see the /models
+	// page for the live list. Empty leaves the snippets without a preset.
 	DefaultModel     string
 	InferenceBaseURL *url.URL
 
@@ -112,6 +127,9 @@ func Load() (*Config, error) {
 		KubernetesNamespace:    strings.TrimSpace(os.Getenv("KUBERNETES_NAMESPACE")),
 		KubernetesKubeconfig:   strings.TrimSpace(os.Getenv("KUBECONFIG")),
 		KubernetesAllowKubecfg: boolEnv("KUBERNETES_ALLOW_KUBECONFIG"),
+
+		ModelsNamespace: strings.TrimSpace(os.Getenv("MODELS_NAMESPACE")),
+		ModelsSelector:  strings.TrimSpace(os.Getenv("MODELS_LABEL_SELECTOR")),
 
 		DevFakeAuth: boolEnv("DEV_FAKE_AUTH"),
 

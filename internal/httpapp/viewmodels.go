@@ -5,6 +5,7 @@ import (
 
 	"github.com/dbirks/kubernetes-llm-api-key-portal/internal/auth"
 	"github.com/dbirks/kubernetes-llm-api-key-portal/internal/brand"
+	"github.com/dbirks/kubernetes-llm-api-key-portal/internal/models"
 	"github.com/dbirks/kubernetes-llm-api-key-portal/internal/onboarding"
 )
 
@@ -40,9 +41,14 @@ type Page struct {
 	// must render a conspicuous banner when it is set.
 	DevMode bool
 
+	// Models is true when the model catalog is configured, which gates the
+	// "Models" nav link. It is independent of whether the current request could
+	// list the catalog: the link shows whenever the feature is on.
+	Models bool
+
 	// ActiveNav names the navigation item base.html marks as current. It is
-	// "keys", "howitworks", or "" when there is nothing to highlight, which is
-	// the case for the signed-out and error pages.
+	// "keys", "models", "howitworks", or "" when there is nothing to highlight,
+	// which is the case for the signed-out and error pages.
 	ActiveNav string
 }
 
@@ -54,6 +60,70 @@ type LandingPage struct {
 // HowItWorksPage backs the static explainer at GET /how-it-works.
 type HowItWorksPage struct {
 	Page
+}
+
+// ModelView is one model as shown on the public /models page.
+type ModelView struct {
+	// Name is the value to copy into the OpenAI "model" field.
+	Name string
+
+	// DisplayName is the human-facing label; it falls back to Name upstream.
+	DisplayName string
+
+	// Status is the machine value, used only to pick the CSS class.
+	Status models.Status
+
+	// StatusLabel is the human-facing status wording.
+	StatusLabel string
+
+	// StatusClass is the pill modifier class for the status.
+	StatusClass string
+}
+
+// ModelsPage backs the public model catalog at GET /models.
+type ModelsPage struct {
+	Page
+	Models []ModelView
+
+	// Enabled is false when no catalog is configured, which renders the
+	// disabled explanatory state rather than a list.
+	Enabled bool
+}
+
+// toModelViews maps catalog entries to their display form, attaching the
+// human-facing status wording and CSS class each pill needs.
+func toModelViews(in []models.Model) []ModelView {
+	out := make([]ModelView, 0, len(in))
+	for _, m := range in {
+		display := m.DisplayName
+		if display == "" {
+			display = m.Name
+		}
+		label, class := statusPresentation(m.Status)
+		out = append(out, ModelView{
+			Name:        m.Name,
+			DisplayName: display,
+			Status:      m.Status,
+			StatusLabel: label,
+			StatusClass: class,
+		})
+	}
+	return out
+}
+
+// statusPresentation maps a status to its wording and pill class. The default
+// arm keeps an unknown status readable rather than blank.
+func statusPresentation(s models.Status) (label, class string) {
+	switch s {
+	case models.StatusReady:
+		return "Ready", "pill-ok"
+	case models.StatusScaledToZero:
+		return "Idle · scaled to zero", "pill-idle"
+	case models.StatusLoading:
+		return "Loading", "pill-loading"
+	default:
+		return "Unavailable", "pill-unavailable"
+	}
 }
 
 // KeyView is one API key as shown in a list.

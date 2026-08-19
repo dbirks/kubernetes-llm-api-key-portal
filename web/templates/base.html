@@ -40,6 +40,10 @@
         <a class="nav-link{{if eq .ActiveNav "keys"}} is-current{{end}}"
            href="/account"{{if eq .ActiveNav "keys"}} aria-current="page"{{end}}>Keys</a>
         {{end}}
+        {{if .Models}}
+        <a class="nav-link{{if eq .ActiveNav "models"}} is-current{{end}}"
+           href="/models"{{if eq .ActiveNav "models"}} aria-current="page"{{end}}>Models</a>
+        {{end}}
         <a class="nav-link{{if eq .ActiveNav "howitworks"}} is-current{{end}}"
            href="/how-it-works"{{if eq .ActiveNav "howitworks"}} aria-current="page"{{end}}>How it works</a>
       </nav>

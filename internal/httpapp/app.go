@@ -17,6 +17,7 @@ import (
 	"github.com/dbirks/kubernetes-llm-api-key-portal/internal/avatar"
 	"github.com/dbirks/kubernetes-llm-api-key-portal/internal/brand"
 	"github.com/dbirks/kubernetes-llm-api-key-portal/internal/keystore"
+	"github.com/dbirks/kubernetes-llm-api-key-portal/internal/models"
 	"github.com/dbirks/kubernetes-llm-api-key-portal/internal/onboarding"
 )
 
@@ -37,6 +38,11 @@ type Options struct {
 	Store  keystore.KeyStore
 	Sealer *auth.Sealer
 	Auth   auth.Provider
+
+	// Models lists the servable model catalog for the public /models page. Nil
+	// turns the feature off: the nav link is hidden and /models renders a
+	// disabled state.
+	Models models.Catalog
 
 	// Assets holds templates/ and static/ subtrees.
 	Assets fs.FS
@@ -66,6 +72,7 @@ type App struct {
 	store    keystore.KeyStore
 	sealer   *auth.Sealer
 	auth     auth.Provider
+	catalog  models.Catalog
 	renderer *renderer
 
 	assets     fs.FS
@@ -98,6 +105,7 @@ func New(opts Options) (*App, error) {
 		store:         opts.Store,
 		sealer:        opts.Sealer,
 		auth:          opts.Auth,
+		catalog:       opts.Models,
 		renderer:      r,
 		assets:        opts.Assets,
 		onboarding:    opts.Onboarding,
@@ -126,6 +134,7 @@ func (a *App) routes() http.Handler {
 	mux.Handle("GET /static/", a.staticHandler())
 
 	mux.HandleFunc("GET /{$}", a.handleLanding)
+	mux.HandleFunc("GET /models", a.handleModels)
 	mux.HandleFunc("GET /how-it-works", a.handleHowItWorks)
 	mux.HandleFunc("GET /login", a.handleLogin)
 	mux.HandleFunc("GET /auth/callback", a.handleCallback)

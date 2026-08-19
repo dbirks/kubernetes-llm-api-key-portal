@@ -19,13 +19,18 @@ Those opinions are baked in rather than abstracted away:
   `llm-portal/*` label prefix exist because that is what kgateway's built-in API-key auth
   selects on. `llm-portal` is a compile-time constant in
   `internal/keystore/kubernetes`, not a setting — it is one half of a contract with the
-  `TrafficPolicy` in the cluster repository, and the two must change together.
-- **vLLM is the backend.** The five client setup guides assume the Anthropic Messages API,
-  OpenAI-compatible endpoints, and the Responses API are all served from the same origin.
+  `TrafficPolicy` in the cluster repository, and the two must change together. Key *enforcement*
+  stays here regardless of what serves the models.
+- **A multi-model catalog is the backend.** Behind the gateway is a KServe/llm-d catalog on one
+  GPU, fronted by an Envoy AI Gateway that routes **by model name** (Qwen3.8-27B, Muse-Glimmer-30B,
+  and more over time). Models **scale to zero** and load on demand, so the first request to an idle
+  model pays a cold start, and a **DFlash2** speculative-decoding drafter speeds up decoding. The
+  five client setup guides assume the Anthropic Messages API, OpenAI-compatible endpoints, and the
+  Responses API are all served from the same origin.
 - **Kubernetes Secrets are the database.** There is no SQL, no ORM, and no user table.
 
 If you want to run this somewhere else, it will work — the branding, hostname, tenant, namespace,
-and model are all configuration — but expect to change the label constant and re-check the gateway
+and models are all configuration — but expect to change the label constant and re-check the gateway
 contract. Treat it as a starting point, not a product.
 
 ```
@@ -33,7 +38,8 @@ Microsoft Entra ID   ->  who is this person?
 This portal          ->  may they create and revoke their own credentials?
 Kubernetes Secrets   ->  where are the credentials stored?
 kgateway             ->  is this API request carrying a valid credential?
-vLLM                 ->  where does the inference request go?
+Envoy AI Gateway     ->  which model does "model": "…" route to?
+KServe / llm-d       ->  load the model on demand and run the request.
 ```
 
 That separation is the whole design. Each layer does one job and knows nothing about the others'
@@ -46,8 +52,17 @@ internals.
 - Creates a new key, shown exactly once.
 - Revokes a key.
 - Generates copy-paste setup instructions for Claude Code, Pi, OpenCode, Codex, and Crush.
+- Lists the servable models at `GET /models`, a public page read from the cluster (not from the
+  auth-gated `/v1/models`), with a per-model status hint and a cold-start note.
 - Explains the moving parts at `GET /how-it-works`, which is public so it can be read before
   signing in.
+
+### How to use (OpenAI-compatible)
+
+Point any OpenAI-compatible client at `https://llm.birks.dev/v1`, send the key as a
+`Bearer` token, and set the `model` field to a name from [`/models`](https://llm.birks.dev/models).
+The gateway routes by that name, so the same key reaches every model. The first call to an idle
+model cold-starts while it loads on demand; later calls are warm.
 
 ## What it deliberately does not do
 
@@ -70,16 +85,24 @@ If it is lost, create a replacement and revoke the old one.
                  |   this portal      |
                  +---------+----------+
                            | Kubernetes API
+                           |   - writes API-key Secrets (create/delete)
+                           |   - reads LLMInferenceServices (list, for /models)
                            v
                    API-key Secrets
                            | selected by label
                            v
-Internet -> Cloudflare Tunnel -> kgateway -> vLLM
+Internet -> Cloudflare Tunnel -> kgateway -> Envoy AI Gateway -> KServe / llm-d
+                                  (checks the key)  (routes by model name)  (scale-to-zero
+                                                                             on-demand models,
+                                                                             DFlash2 spec-decode)
 ```
 
-Deployment manifests — Gateway, HTTPRoute, TrafficPolicy, RBAC, Cloudflare Tunnel, vLLM — live in
-the cluster repository (`dbirks/home-k8s`), not here. This repository produces one container image
-and documents the contract that image expects.
+The portal's read of `LLMInferenceServices` is read-only and only powers the `/models` page; it is
+independent of key enforcement, which remains kgateway's job.
+
+Deployment manifests — Gateway, HTTPRoute, TrafficPolicy, RBAC, Cloudflare Tunnel, Envoy AI Gateway,
+and the KServe/llm-d model set — live in the cluster repository (`dbirks/home-k8s`), not here. This
+repository produces one container image and documents the contract that image expects.
 
 ## Quick start
 
@@ -184,8 +207,10 @@ Everything about this is best-effort, and initials are the fallback in every fai
 | `KEYSTORE_MODE` | `memory` | `memory` or `kubernetes`. |
 | `KUBERNETES_NAMESPACE` | — | Required when `KEYSTORE_MODE=kubernetes`. |
 | `KUBERNETES_ALLOW_KUBECONFIG` | `false` | Permit falling back to a local kubeconfig outside a cluster. |
+| `MODELS_NAMESPACE` | — | Namespace holding the KServe `LLMInferenceService` objects the `/models` page lists. Empty turns the page off and hides the nav link. Only read in `kubernetes` keystore mode. |
+| `MODELS_LABEL_SELECTOR` | — | Optional label selector narrowing the catalog to a curated subset, e.g. `tier=public`. Empty lists them all. |
 | `API_KEY_PREFIX` | `llm_` | Prefix on generated credentials. |
-| `DEFAULT_MODEL` | — | Served model name used in the setup snippets. |
+| `DEFAULT_MODEL` | — | The **recommended/default** model prefilled into the setup snippets — a convenience, not the only model available. Clients may set `model` to any name the gateway routes; see `/models` for the live list. |
 | `ENTRA_AVATARS` | `true` | Microsoft profile photos in the header. See above. |
 | `INFERENCE_BASE_URL` | `PUBLIC_BASE_URL` | Set only if `/v1/*` lives on a different hostname than the portal. |
 | `DEV_ASSETS_DIR` | — | Serve templates and CSS from disk with per-request reload. |
@@ -359,6 +384,20 @@ existing credential Secret, and withholding the verb makes that structural.
 The dedicated namespace matters. Kubernetes RBAC cannot restrict Secret access by label, only by
 namespace and name, so the namespace is the actual blast-radius boundary.
 
+When the `/models` page is enabled (`MODELS_NAMESPACE` set), the ServiceAccount also needs
+read-only access to the model objects in that namespace:
+
+```yaml
+rules:
+  - apiGroups: ["serving.kserve.io"]
+    resources: ["llminferenceservices"]
+    verbs: ["get", "list", "watch"]
+```
+
+Read-only, and only in the models namespace. The portal never creates, deletes, or edits a model —
+it lists them for display. This Role lives in the cluster repository (`dbirks/home-k8s`) alongside
+the model objects, not here.
+
 ## Security notes
 
 **Credentials are stored in cleartext in Kubernetes Secrets.** This is a deliberate trade-off, not
@@ -478,6 +517,7 @@ internal/auth/       OIDC flow, sealed sessions, middleware, dev bypass
 internal/keystore/   KeyStore interface, credential generation
   memory/            in-process store for development and tests
   kubernetes/        production store
+internal/models/     read-only KServe model catalog for the /models page
 internal/onboarding/ client setup guides, golden-tested
 internal/httpapp/    routing, handlers, middleware, view models
 web/                 templates and static assets, embedded via go:embed
@@ -493,8 +533,12 @@ Before pointing colleagues at the portal, confirm against the kgateway release a
 - [ ] `X-Api-Key: <key>` is accepted where Anthropic-style clients need it.
 - [ ] A revoked key stops authenticating after the normal watch propagation delay.
 - [ ] `forwardCredential` is `false` unless something downstream genuinely needs it.
-- [ ] Only the intended inference routes are publicly exposed — no vLLM management endpoints.
+- [ ] Only the intended inference routes are publicly exposed — no model management endpoints.
 - [ ] `/v1/responses` is served and routed, which the Codex setup snippet depends on.
+- [ ] The Envoy AI Gateway routes each `model` name from `/models` to the right KServe backend, and
+      a request naming an idle model cold-starts rather than failing.
+- [ ] The ServiceAccount can `list` `llminferenceservices` in `MODELS_NAMESPACE` — otherwise
+      `/models` returns its friendly 503. (This Role lives in `dbirks/home-k8s`.)
 
 Each of the five client setup snippets should be tested end to end. They are the part of this
 repository most likely to drift.
