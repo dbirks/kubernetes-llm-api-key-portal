@@ -22,11 +22,13 @@ Those opinions are baked in rather than abstracted away:
   `TrafficPolicy` in the cluster repository, and the two must change together. Key *enforcement*
   stays here regardless of what serves the models.
 - **A multi-model catalog is the backend.** Behind the gateway is a KServe/llm-d catalog on one
-  GPU, fronted by an Envoy AI Gateway that routes **by model name** (Qwen3.8-27B, Muse-Glimmer-30B,
-  and more over time). Models **scale to zero** and load on demand, so the first request to an idle
-  model pays a cold start, and a **DFlash2** speculative-decoding drafter speeds up decoding. The
-  five client setup guides assume the Anthropic Messages API, OpenAI-compatible endpoints, and the
-  Responses API are all served from the same origin.
+  GPU, fronted by an Envoy AI Gateway. Two models are live today — **Qwen3.8-27B** (coding) on the
+  portal origin's `/v1`, and **Muse-Glimmer-30B** (reasoning) under `/muse/v1` — each authenticated
+  by the same key. The setup picker parameterises every client guide per model, so a selection
+  produces the exact base URL and model name for that model. Models can **scale to zero** and load
+  on demand, so a first request to an idle model pays a cold start. The client guides assume the
+  Anthropic Messages API, OpenAI-compatible endpoints, and the Responses API are all served from the
+  same origin (per model base path).
 - **Kubernetes Secrets are the database.** There is no SQL, no ORM, and no user table.
 
 If you want to run this somewhere else, it will work — the branding, hostname, tenant, namespace,
@@ -51,18 +53,36 @@ internals.
 - Lists the API keys that user owns.
 - Creates a new key, shown exactly once.
 - Revokes a key.
-- Generates copy-paste setup instructions for Claude Code, Pi, OpenCode, Codex, and Crush.
+- Generates copy-paste setup instructions through a **model × client picker**: choose a model
+  (e.g. `qwen3.8-nvfp4` or `muse-glimmer-30b`) and a client (Claude Code, a generic
+  OpenAI-compatible client, Cursor, a raw `curl`, plus Pi, OpenCode, Codex, and Crush), and get the
+  exact config with the correct base URL for that model.
 - Lists the servable models at `GET /models`, a public page read from the cluster (not from the
   auth-gated `/v1/models`), with a per-model status hint and a cold-start note.
+- Links to a metrics dashboard (`GRAFANA_URL`, e.g. `https://llm.birks.dev/grafana`) from the
+  header and the account page, when one is configured.
 - Explains the moving parts at `GET /how-it-works`, which is public so it can be read before
   signing in.
 
 ### How to use (OpenAI-compatible)
 
-Point any OpenAI-compatible client at `https://llm.birks.dev/v1`, send the key as a
-`Bearer` token, and set the `model` field to a name from [`/models`](https://llm.birks.dev/models).
-The gateway routes by that name, so the same key reaches every model. The first call to an idle
-model cold-starts while it loads on demand; later calls are warm.
+Each model has a base URL and a model name; the same key works for all of them:
+
+| Model | Kind | Base URL | `model` field |
+|---|---|---|---|
+| Qwen3.8-27B | coding | `https://llm.birks.dev/v1` | `qwen3.8-nvfp4` |
+| Muse-Glimmer-30B | reasoning | `https://llm.birks.dev/muse/v1` | `muse-glimmer-30b` |
+
+Point any OpenAI-compatible client at the model's base URL, send the key as a `Bearer` token, and
+set the `model` field to match. Claude Code uses the base **without** `/v1` as `ANTHROPIC_BASE_URL`
+(it appends `/v1/messages` itself). The first call to an idle model cold-starts while it loads on
+demand; later calls are warm.
+
+**Muse-Glimmer is a reasoning model** — it thinks before it answers, so allow a generous
+`max_tokens` (2048 or more) or the reply can be cut off mid-thought.
+
+The live list, including any models added later, is on [`/models`](https://llm.birks.dev/models),
+and your account page generates the copy-paste snippet for each model and client.
 
 ## What it deliberately does not do
 
@@ -113,7 +133,10 @@ export PUBLIC_BASE_URL=http://localhost:8080
 export SESSION_KEY=$(openssl rand -base64 32)
 export KEYSTORE_MODE=memory
 export DEV_FAKE_AUTH=1
-export DEFAULT_MODEL=Qwen3-Coder-30B
+# One model, or a picker over several with per-model base paths:
+export ONBOARDING_MODELS='[{"id":"qwen3.8-nvfp4","label":"Qwen3.8","kind":"coding","path":""},{"id":"muse-glimmer-30b","label":"Muse-Glimmer 30B","kind":"reasoning","path":"/muse"}]'
+# Optional metrics link in the header:
+export GRAFANA_URL=https://llm.birks.dev/grafana
 
 go run ./cmd/ai-account
 ```
@@ -210,9 +233,25 @@ Everything about this is best-effort, and initials are the fallback in every fai
 | `MODELS_NAMESPACE` | — | Namespace holding the KServe `LLMInferenceService` objects the `/models` page lists. Empty turns the page off and hides the nav link. Only read in `kubernetes` keystore mode. |
 | `MODELS_LABEL_SELECTOR` | — | Optional label selector narrowing the catalog to a curated subset, e.g. `tier=public`. Empty lists them all. |
 | `API_KEY_PREFIX` | `llm_` | Prefix on generated credentials. |
-| `DEFAULT_MODEL` | — | The **recommended/default** model prefilled into the setup snippets — a convenience, not the only model available. Clients may set `model` to any name the gateway routes; see `/models` for the live list. |
+| `ONBOARDING_MODELS` | — | JSON array of models the setup picker offers, each with its own base path. See below. Empty falls back to a single model built from `DEFAULT_MODEL`. |
+| `DEFAULT_MODEL` | — | Single-model fallback prefilled into the setup snippets when `ONBOARDING_MODELS` is unset — a convenience, not the only model available. Clients may set `model` to any name the gateway routes; see `/models` for the live list. |
+| `GRAFANA_URL` | — | Absolute http(s) URL (may include a path, e.g. `https://llm.birks.dev/grafana`). When set, a **Metrics** link appears in the header and on the account page. Empty hides it. |
 | `ENTRA_AVATARS` | `true` | Microsoft profile photos in the header. See above. |
 | `INFERENCE_BASE_URL` | `PUBLIC_BASE_URL` | Set only if `/v1/*` lives on a different hostname than the portal. |
+
+`ONBOARDING_MODELS` is a JSON array. Each entry is `{ "id", "label", "kind", "path" }`:
+
+- `id` (required) — the value sent in the OpenAI `model` field.
+- `label` — human name shown on the picker; defaults to `id`.
+- `kind` — `"coding"`, `"reasoning"`, or empty. A `reasoning` model's snippets carry a max_tokens reminder.
+- `path` — base-path segment the model is served under, before `/v1`, with a leading slash and no trailing one — `""` for the portal origin, `"/muse"` for a model routed under a subpath.
+
+```json
+[
+  {"id": "qwen3.8-nvfp4",    "label": "Qwen3.8",          "kind": "coding",    "path": ""},
+  {"id": "muse-glimmer-30b", "label": "Muse-Glimmer 30B", "kind": "reasoning", "path": "/muse"}
+]
+```
 | `DEV_ASSETS_DIR` | — | Serve templates and CSS from disk with per-request reload. |
 | `DEV_FAKE_AUTH` | `false` | Development sign-in bypass. See the guard rails above. |
 
@@ -540,7 +579,7 @@ Before pointing colleagues at the portal, confirm against the kgateway release a
 - [ ] The ServiceAccount can `list` `llminferenceservices` in `MODELS_NAMESPACE` — otherwise
       `/models` returns its friendly 503. (This Role lives in `dbirks/home-k8s`.)
 
-Each of the five client setup snippets should be tested end to end. They are the part of this
+Each client setup snippet should be tested end to end, for each model. They are the part of this
 repository most likely to drift.
 
 ## License

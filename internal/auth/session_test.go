@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -138,20 +139,26 @@ func TestTamperedCookieIsRejected(t *testing.T) {
 	req := roundTrip(t, s, SessionUser{TenantID: "t", ObjectID: "o"})
 
 	original := req.Cookies()[0]
-	// flip returns the value with one character swapped for a different one, so
-	// the mutation is guaranteed to change the ciphertext.
-	flip := func(value string, i int) string {
-		replacement := byte('A')
-		if value[i] == 'A' {
-			replacement = 'B'
-		}
-		return value[:i] + string(replacement) + value[i+1:]
+
+	// flip mutates one byte of the decoded payload and re-encodes it. Decoding
+	// first is deliberate: RawURLEncoding is non-canonical, so flipping the last
+	// base64 *character* may only touch trailing bits the decoder discards,
+	// leaving the ciphertext — and the GCM tag — unchanged. Mutating a decoded
+	// byte is what actually guarantees the seal no longer verifies.
+	raw, err := base64.RawURLEncoding.DecodeString(original.Value)
+	if err != nil {
+		t.Fatalf("sealed cookie is not valid base64: %v", err)
+	}
+	flip := func(i int) string {
+		b := append([]byte(nil), raw...)
+		b[i] ^= 0xff
+		return base64.RawURLEncoding.EncodeToString(b)
 	}
 	tampered := []string{
-		flip(original.Value, len(original.Value)-1), // last byte of the tag
-		flip(original.Value, 0),                     // first byte of the nonce
-		flip(original.Value, len(original.Value)/2), // middle of the ciphertext
-		original.Value[:len(original.Value)/2],      // truncated
+		flip(len(raw) - 1),                     // last byte of the tag
+		flip(0),                                // first byte of the nonce
+		flip(len(raw) / 2),                     // middle of the ciphertext
+		original.Value[:len(original.Value)/2], // truncated
 		"not-base64-at-all!!",
 		"",
 	}

@@ -48,6 +48,97 @@ func claudeCode(r resolved) Guide {
 	}
 }
 
+func openaiCompatible(r resolved) Guide {
+	commands := strings.Join([]string{
+		keyExport(r),
+		"",
+		exportLine("OPENAI_BASE_URL", r.APIBase),
+		fmt.Sprintf("export OPENAI_API_KEY=\"$%s\"", r.EnvVar),
+	}, "\n")
+
+	return Guide{
+		ID:          "openai",
+		Name:        "OpenAI-compatible",
+		Description: fmt.Sprintf("Point any OpenAI-compatible client or SDK at %s. These are the two variables every OpenAI SDK already reads — the official Python and Node clients, LiteLLM, LangChain, LlamaIndex, and most tools that take a custom base URL.", r.BrandName),
+		Commands:    []GuideBlock{{Language: "bash", Content: commands}},
+		Notes: []string{
+			fmt.Sprintf("Set the request's \"model\" field to %q. The same key reaches every model — only the base URL and model name change.", r.Model),
+			"The endpoint serves the OpenAI Chat Completions and Responses APIs, so /v1/chat/completions and /v1/responses both work.",
+			fmt.Sprintf("OPENAI_API_KEY reads from $%s so the credential stays in your environment rather than a file.", r.EnvVar),
+		},
+		AgentPrompt: agentPrompt(r, "an OpenAI-compatible client",
+			fmt.Sprintf("Set OPENAI_BASE_URL to %s and OPENAI_API_KEY to the credential from my environment.", r.APIBase)),
+	}
+}
+
+func cursor(r resolved) Guide {
+	// Cursor is configured in its Settings UI, not a file on disk, so the
+	// "file" here is the set of exact values to paste into those fields. The
+	// credential lives in the element body only, like every other snippet.
+	values := strings.Join([]string{
+		"Base URL:  " + r.APIBase,
+		"API key:   " + r.Key,
+		"Model:     " + r.Model,
+	}, "\n")
+
+	return Guide{
+		ID:          "cursor",
+		Name:        "Cursor",
+		Description: fmt.Sprintf("Cursor talks to any OpenAI-compatible endpoint. Add %s in Settings → Models, then add the model by name so you can select it.", r.BrandName),
+		Files: []GuideFile{{
+			Path:     "Cursor · Settings → Models → OpenAI API Key",
+			Language: "text",
+			Content:  values,
+		}},
+		Notes: []string{
+			"Open Settings → Models (Cmd/Ctrl+Shift+J, then Models).",
+			"Enable “Override OpenAI Base URL” and paste the Base URL above.",
+			"Paste the API key into the OpenAI API Key field and click Verify.",
+			fmt.Sprintf("Under “Model Names”, add %q so it shows up in the model picker.", r.Model),
+			"Cursor's agent works over these OpenAI-compatible models; a few Cursor-proprietary features still route to Cursor's own models.",
+		},
+		AgentPrompt: agentPrompt(r, "Cursor",
+			"Configure Cursor's OpenAI API settings: override the base URL, set the API key, and add the model name as a custom model."),
+	}
+}
+
+func curlGuide(r resolved) Guide {
+	// A single-quoted body spans multiple lines in the shell, so the JSON reads
+	// naturally without escaping.
+	lines := []string{
+		keyExport(r),
+		"",
+		"curl " + r.APIBase + "/chat/completions \\",
+		fmt.Sprintf("  -H \"Authorization: Bearer $%s\" \\", r.EnvVar),
+		"  -H \"Content-Type: application/json\" \\",
+		"  -d '{",
+		"        \"model\": " + jsonString(r.Model) + ",",
+	}
+	if r.Kind == KindReasoning {
+		// A reasoning model spends tokens thinking before it replies, so a raw
+		// request needs headroom or the visible answer is truncated.
+		lines = append(lines, "        \"max_tokens\": 2048,")
+	}
+	lines = append(lines,
+		"        \"messages\": [{\"role\": \"user\", \"content\": \"Say hello in one sentence.\"}]",
+		"      }'",
+	)
+	commands := strings.Join(lines, "\n")
+
+	return Guide{
+		ID:          "curl",
+		Name:        "curl",
+		Description: fmt.Sprintf("A one-shot request to confirm your key and %s are reachable, with no client to install.", r.BrandName),
+		Commands:    []GuideBlock{{Language: "bash", Content: commands}},
+		Notes: []string{
+			"A 200 with a chat completion means the key, gateway, and model are all working.",
+			fmt.Sprintf("Swap %q for any name from the model list to try a different model.", r.Model),
+		},
+		AgentPrompt: agentPrompt(r, "curl",
+			fmt.Sprintf("Send a POST to %s/chat/completions with the model %q and the API key from my environment as a Bearer token.", r.APIBase, r.Model)),
+	}
+}
+
 func pi(r resolved) Guide {
 	// Built with the JSON encoder so an operator brand name containing quotes
 	// cannot produce a broken config file.

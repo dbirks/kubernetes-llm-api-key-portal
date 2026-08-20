@@ -76,7 +76,7 @@ func TestGuidesMatchGolden(t *testing.T) {
 
 func TestAllClientsArePresent(t *testing.T) {
 	guides := Guides(testParams())
-	want := []string{"claude-code", "pi", "opencode", "codex", "crush"}
+	want := []string{"claude-code", "openai", "cursor", "curl", "pi", "opencode", "codex", "crush"}
 
 	if len(guides) != len(want) {
 		t.Fatalf("got %d guides, want %d", len(guides), len(want))
@@ -84,6 +84,47 @@ func TestAllClientsArePresent(t *testing.T) {
 	for i, id := range want {
 		if guides[i].ID != id {
 			t.Errorf("guide %d = %q, want %q", i, guides[i].ID, id)
+		}
+	}
+}
+
+// A model served under a base path must have that path in the URLs its guides
+// generate, so a picker selection actually points at the right endpoint.
+func TestModelPathIsAppliedToBaseURL(t *testing.T) {
+	p := Params{
+		BaseURL:   "https://llm.birks.dev",
+		BrandName: "llm.birks.dev",
+		Models: []Model{
+			{ID: "qwen3.8-nvfp4", Label: "Qwen", Kind: KindCoding, Path: ""},
+			{ID: "muse-glimmer-30b", Label: "Muse", Kind: KindReasoning, Path: "/muse"},
+		},
+	}
+	setups := Setups(p)
+	if len(setups) != 2 {
+		t.Fatalf("got %d setups, want 2", len(setups))
+	}
+	if setups[0].APIBase != "https://llm.birks.dev/v1" {
+		t.Errorf("qwen APIBase = %q", setups[0].APIBase)
+	}
+	if setups[1].APIBase != "https://llm.birks.dev/muse/v1" {
+		t.Errorf("muse APIBase = %q", setups[1].APIBase)
+	}
+	// Every muse guide must route under the /muse path (Claude Code uses the
+	// bare base and appends /v1 itself; the OpenAI-style guides carry /muse/v1),
+	// and every one must carry the reasoning note.
+	for _, g := range setups[1].Guides {
+		text := render(g)
+		if !strings.Contains(text, "llm.birks.dev/muse") {
+			t.Errorf("muse guide %q does not route under /muse:\n%s", g.ID, text)
+		}
+		if !strings.Contains(text, "reasoning model") {
+			t.Errorf("muse guide %q lacks the reasoning-model note", g.ID)
+		}
+	}
+	// Coding-model guides must not carry the reasoning note.
+	for _, g := range setups[0].Guides {
+		if strings.Contains(render(g), "reasoning model") {
+			t.Errorf("coding guide %q wrongly carries the reasoning note", g.ID)
 		}
 	}
 }

@@ -49,7 +49,10 @@
       {{end}}
       {{end}}
 
-      <h3 class="visually-hidden">Connect a coding agent</h3>
+      <div class="connect-head">
+        <h3 class="eyebrow">Connect a client</h3>
+        <p class="connect-sub">Pick a model and your client for a copy-paste setup.</p>
+      </div>
       {{template "guides.html" .}}
 
       <p class="fine-print">
@@ -67,4 +70,40 @@
   </div>
   {{end}}
 </div>
+
+{{/* Endpoints summary: what you can call, where, and where to watch it run.
+     Independent of the live /models status page. */}}
+{{if or .Catalog .Models .GrafanaURL}}
+<div class="panel panel-pad endpoints">
+  <div class="endpoints-head">
+    <h2 class="eyebrow">Endpoints</h2>
+    <div class="endpoints-links">
+      {{if .Models}}<a class="endpoints-link" href="/models">Live model status →</a>{{end}}
+      {{if .GrafanaURL}}<a class="endpoints-link" href="{{.GrafanaURL}}" target="_blank" rel="noopener">Metrics dashboard →</a>{{end}}
+    </div>
+  </div>
+
+  {{if .Catalog}}
+  <ul class="endpoint-list" role="list">
+    {{range .Catalog}}
+    <li class="endpoint-row">
+      <div class="endpoint-headings">
+        <span class="endpoint-name">
+          {{.Label}}
+          {{if eq (printf "%s" .Kind) "reasoning"}}<span class="picker-kind">reasoning</span>
+          {{else if eq (printf "%s" .Kind) "coding"}}<span class="picker-kind">coding</span>{{end}}
+        </span>
+        <code class="endpoint-id">model: {{.ID}}</code>
+      </div>
+      <code class="endpoint-base">{{.APIBase}}</code>
+    </li>
+    {{end}}
+  </ul>
+  <p class="fine-print">
+    The same key reaches every model — the base URL and the <code>model</code>
+    field are what change between them.
+  </p>
+  {{end}}
+</div>
+{{end}}
 {{end}}

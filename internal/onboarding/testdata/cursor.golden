@@ -1,0 +1,19 @@
+id: cursor
+name: Cursor
+
+Cursor talks to any OpenAI-compatible endpoint. Add llm.birks.dev in Settings → Models, then add the model by name so you can select it.
+
+--- file Cursor · Settings → Models → OpenAI API Key (text) ---
+Base URL:  https://llm.birks.dev/v1
+API key:   YOUR_API_KEY
+Model:     Qwen3-Coder-30B
+
+--- notes ---
+- Open Settings → Models (Cmd/Ctrl+Shift+J, then Models).
+- Enable “Override OpenAI Base URL” and paste the Base URL above.
+- Paste the API key into the OpenAI API Key field and click Verify.
+- Under “Model Names”, add "Qwen3-Coder-30B" so it shows up in the model picker.
+- Cursor's agent works over these OpenAI-compatible models; a few Cursor-proprietary features still route to Cursor's own models.
+
+--- agent prompt ---
+Configure Cursor on this machine to use my self-hosted llm.birks.dev endpoint at https://llm.birks.dev. Configure Cursor's OpenAI API settings: override the base URL, set the API key, and add the model name as a custom model. Use the model "Qwen3-Coder-30B". Read the API key from the LLM_BIRKS_DEV_API_KEY environment variable. Do not write the key itself into any file in a git repository, and do not print it. Preserve my existing unrelated configuration.

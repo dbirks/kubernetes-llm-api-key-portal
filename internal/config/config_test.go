@@ -17,6 +17,7 @@ func setEnv(t *testing.T, env map[string]string) {
 		"KUBERNETES_ALLOW_KUBECONFIG", "KUBECONFIG",
 		"MODELS_NAMESPACE", "MODELS_LABEL_SELECTOR",
 		"API_KEY_PREFIX", "DEFAULT_MODEL", "INFERENCE_BASE_URL", "DEV_FAKE_AUTH",
+		"ONBOARDING_MODELS", "GRAFANA_URL",
 		"BRAND_NAME", "BRAND_SHORT_NAME", "BRAND_ORG_NAME", "BRAND_TAGLINE", "BRAND_LOGO_FILE",
 		"BRAND_LOGO_ALT", "BRAND_FAVICON_FILE", "BRAND_ACCENT", "BRAND_ACCENT_DARK",
 		"BRAND_SUPPORT_EMAIL", "BRAND_SUPPORT_URL",
@@ -412,5 +413,69 @@ func TestModelsCatalogConfig(t *testing.T) {
 	}
 	if cfg.ModelsSelector != "tier=public" {
 		t.Errorf("ModelsSelector = %q, want tier=public", cfg.ModelsSelector)
+	}
+}
+
+func TestOnboardingModelsConfig(t *testing.T) {
+	// Empty by default.
+	setEnv(t, productionEnv())
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(cfg.OnboardingModels) != 0 {
+		t.Errorf("OnboardingModels = %v, want empty by default", cfg.OnboardingModels)
+	}
+
+	env := productionEnv()
+	env["ONBOARDING_MODELS"] = `[{"id":"qwen3.8-nvfp4","label":"Qwen3.8","kind":"coding","path":""},{"id":"muse-glimmer-30b","label":"Muse","kind":"reasoning","path":"/muse"}]`
+	setEnv(t, env)
+	cfg, err = Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(cfg.OnboardingModels) != 2 {
+		t.Fatalf("got %d models, want 2", len(cfg.OnboardingModels))
+	}
+	if got := cfg.OnboardingModels[1]; got.ID != "muse-glimmer-30b" || got.Path != "/muse" || got.Kind != "reasoning" {
+		t.Errorf("second model = %+v", got)
+	}
+}
+
+func TestOnboardingModelsRejectsBadInput(t *testing.T) {
+	cases := map[string]string{
+		"not JSON":           `nonsense`,
+		"missing id":         `[{"label":"x"}]`,
+		"path without slash": `[{"id":"m","path":"muse"}]`,
+		"unknown kind":       `[{"id":"m","kind":"chat"}]`,
+	}
+	for name, val := range cases {
+		t.Run(name, func(t *testing.T) {
+			env := productionEnv()
+			env["ONBOARDING_MODELS"] = val
+			setEnv(t, env)
+			if _, err := Load(); err == nil {
+				t.Errorf("Load accepted invalid ONBOARDING_MODELS %q", val)
+			}
+		})
+	}
+}
+
+func TestGrafanaURLConfig(t *testing.T) {
+	env := productionEnv()
+	env["GRAFANA_URL"] = "https://llm.birks.dev/grafana/"
+	setEnv(t, env)
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.GrafanaURL != "https://llm.birks.dev/grafana" {
+		t.Errorf("GrafanaURL = %q, want the trimmed URL", cfg.GrafanaURL)
+	}
+
+	env["GRAFANA_URL"] = "not-a-url"
+	setEnv(t, env)
+	if _, err := Load(); err == nil {
+		t.Error("Load accepted an invalid GRAFANA_URL")
 	}
 }

@@ -63,6 +63,10 @@ type Options struct {
 	// DevMode indicates the development login bypass is active, which every
 	// page must advertise.
 	DevMode bool
+
+	// GrafanaURL, when non-empty, surfaces a metrics link in the header and on
+	// the account page. Empty hides it.
+	GrafanaURL string
 }
 
 // App is the assembled web application.
@@ -78,6 +82,8 @@ type App struct {
 	assets     fs.FS
 	onboarding onboarding.Params
 	photos     PhotoStore
+
+	grafanaURL string
 
 	secureCookies bool
 	devMode       bool
@@ -110,6 +116,7 @@ func New(opts Options) (*App, error) {
 		assets:        opts.Assets,
 		onboarding:    opts.Onboarding,
 		photos:        opts.Photos,
+		grafanaURL:    opts.GrafanaURL,
 		secureCookies: opts.SecureCookies,
 		devMode:       opts.DevMode,
 	}

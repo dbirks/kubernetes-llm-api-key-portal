@@ -30,10 +30,9 @@
 
   /* ---- preferences ------------------------------------------------------ */
 
-  // Neither of these is security-relevant: one remembers which client tab you
-  // were reading, the other which shell you use.
+  // Not security-relevant: these only remember which model and client tab you
+  // last had open in the setup picker.
   var CLIENT_KEY = "portal.client";
-  var SHELL_KEY = "portal.shell";
 
   function readPref(name) {
     try {
@@ -104,121 +103,116 @@
     if (button) copy(button);
   });
 
-  /* ---- client guide tabs ------------------------------------------------ */
+  /* ---- model + client picker -------------------------------------------- */
 
-  // Upgrades the <details> list into a tab strip. Panels are never removed from
-  // the DOM, only closed, so in-page search and printing still find them.
-  document.querySelectorAll("[data-guides]").forEach(function (container) {
-    var tabList = container.querySelector("[data-guide-tabs]");
-    var panels = Array.prototype.slice.call(
-      container.querySelectorAll("[data-guide-panel]")
-    );
-    if (!tabList || panels.length === 0) return;
+  // Upgrades the stacked model×client panels into a pair of segmented controls
+  // that select which single panel is shown. Panels are never removed from the
+  // DOM, only hidden, so in-page search and printing still find them all.
+  var MODEL_KEY = "portal.model";
 
-    var tabs = Array.prototype.slice.call(tabList.querySelectorAll(".guide-tab"));
-    if (tabs.length === 0) return;
-
-    tabList.hidden = false;
-    tabList.setAttribute("role", "tablist");
-    tabs.forEach(function (tab) {
-      tab.setAttribute("role", "tab");
-      tab.parentElement.setAttribute("role", "presentation");
-    });
-    container.setAttribute("data-enhanced", "");
-
-    function select(id, remember) {
-      panels.forEach(function (panel) {
-        panel.open = panel.id === id;
-      });
-      tabs.forEach(function (tab) {
-        var active = tab.getAttribute("data-guide-target") === id;
-        tab.setAttribute("aria-selected", active ? "true" : "false");
-        // Roving tabindex: one stop for the strip, arrow keys move within it.
-        tab.tabIndex = active ? 0 : -1;
-      });
-      if (remember) writePref(CLIENT_KEY, id);
-    }
-
-    tabList.addEventListener("click", function (event) {
-      var tab = event.target.closest(".guide-tab");
-      if (tab) select(tab.getAttribute("data-guide-target"), true);
-    });
-
-    tabList.addEventListener("keydown", function (event) {
+  // arrowNav wires roving-tabindex arrow-key movement onto a strip of tabs.
+  function arrowNav(tabs, onSelect) {
+    return function (event) {
       var index = tabs.indexOf(document.activeElement);
       if (index < 0) return;
       var next = null;
-      if (event.key === "ArrowRight") next = (index + 1) % tabs.length;
-      if (event.key === "ArrowLeft") next = (index - 1 + tabs.length) % tabs.length;
+      if (event.key === "ArrowRight" || event.key === "ArrowDown") next = (index + 1) % tabs.length;
+      if (event.key === "ArrowLeft" || event.key === "ArrowUp") next = (index - 1 + tabs.length) % tabs.length;
       if (event.key === "Home") next = 0;
       if (event.key === "End") next = tabs.length - 1;
       if (next === null) return;
       event.preventDefault();
       tabs[next].focus();
-      select(tabs[next].getAttribute("data-guide-target"), true);
-    });
-
-    var remembered = readPref(CLIENT_KEY);
-    var known = panels.some(function (panel) { return panel.id === remembered; });
-    select(known ? remembered : panels[0].id, false);
-  });
-
-  /* ---- shell toggle ----------------------------------------------------- */
-
-  // Rendered only when a guide ships more than one command block. Without this
-  // upgrade the blocks are simply stacked, each under its own shell heading.
-  function looksLikePowerShell(name) {
-    return /power ?shell|pwsh|ps1/i.test(name || "");
+      onSelect(tabs[next]);
+    };
   }
 
-  var prefersPowerShell = /Windows/i.test(navigator.userAgent || "");
+  document.querySelectorAll("[data-picker]").forEach(function (picker) {
+    var controls = picker.querySelector("[data-picker-controls]");
+    var panels = Array.prototype.slice.call(picker.querySelectorAll("[data-guide-panel]"));
+    if (panels.length === 0) return;
 
-  document.querySelectorAll("[data-shell-tabs]").forEach(function (tabList) {
-    var tabs = Array.prototype.slice.call(tabList.querySelectorAll(".shell-tab"));
-    if (tabs.length < 2) return;
+    var modelTabs = Array.prototype.slice.call(
+      picker.querySelectorAll("[data-model-tabs] .guide-tab")
+    );
+    var clientTabs = Array.prototype.slice.call(
+      picker.querySelectorAll("[data-client-tabs] .guide-tab")
+    );
+    if (clientTabs.length === 0) return;
 
-    var panels = tabs
-      .map(function (tab) {
-        return document.getElementById(tab.getAttribute("data-shell-target") + "-panel");
-      })
-      .filter(Boolean);
-    if (panels.length !== tabs.length) return;
-
-    tabList.hidden = false;
-    tabList.setAttribute("role", "tablist");
-    tabs.forEach(function (tab) {
-      tab.setAttribute("role", "tab");
-      tab.parentElement.setAttribute("role", "presentation");
+    if (controls) controls.hidden = false;
+    picker.setAttribute("data-enhanced", "");
+    [modelTabs, clientTabs].forEach(function (strip) {
+      strip.forEach(function (tab) {
+        tab.setAttribute("role", "tab");
+        if (tab.parentElement) tab.parentElement.setAttribute("role", "presentation");
+      });
     });
 
-    function select(lang, remember) {
-      tabs.forEach(function (tab, i) {
-        var active = tab.getAttribute("data-shell-lang") === lang;
+    // The first panel's data-model is the default model; data-default-client
+    // (or the first client tab) is the default client.
+    var current = {
+      model: panels[0].getAttribute("data-model"),
+      client: picker.getAttribute("data-default-client") ||
+        clientTabs[0].getAttribute("data-client-target"),
+    };
+
+    function markStrip(tabs, attr, value) {
+      tabs.forEach(function (tab) {
+        var active = tab.getAttribute(attr) === value;
         tab.setAttribute("aria-selected", active ? "true" : "false");
         tab.tabIndex = active ? 0 : -1;
-        panels[i].hidden = !active;
       });
-      if (remember) writePref(SHELL_KEY, lang);
     }
 
-    function langs() {
-      return tabs.map(function (tab) { return tab.getAttribute("data-shell-lang"); });
+    function apply() {
+      panels.forEach(function (panel) {
+        var on = panel.getAttribute("data-model") === current.model &&
+          panel.getAttribute("data-client") === current.client;
+        panel.classList.toggle("is-active", on);
+      });
+      markStrip(modelTabs, "data-model-target", current.model);
+      markStrip(clientTabs, "data-client-target", current.client);
     }
 
-    tabList.addEventListener("click", function (event) {
-      var tab = event.target.closest(".shell-tab");
-      if (tab) select(tab.getAttribute("data-shell-lang"), true);
+    function setModel(value, remember) {
+      // Guard against a remembered value no client offers any more.
+      if (!modelTabs.some(function (t) { return t.getAttribute("data-model-target") === value; }) &&
+          !panels.some(function (p) { return p.getAttribute("data-model") === value; })) return;
+      current.model = value;
+      if (remember) writePref(MODEL_KEY, value);
+      apply();
+    }
+
+    function setClient(value, remember) {
+      if (!clientTabs.some(function (t) { return t.getAttribute("data-client-target") === value; })) return;
+      current.client = value;
+      if (remember) writePref(CLIENT_KEY, value);
+      apply();
+    }
+
+    if (modelTabs.length) {
+      picker.querySelector("[data-model-tabs]").addEventListener("click", function (event) {
+        var tab = event.target.closest(".guide-tab");
+        if (tab) setModel(tab.getAttribute("data-model-target"), true);
+      });
+      picker.querySelector("[data-model-tabs]").addEventListener("keydown",
+        arrowNav(modelTabs, function (tab) { setModel(tab.getAttribute("data-model-target"), true); }));
+    }
+    picker.querySelector("[data-client-tabs]").addEventListener("click", function (event) {
+      var tab = event.target.closest(".guide-tab");
+      if (tab) setClient(tab.getAttribute("data-client-target"), true);
     });
+    picker.querySelector("[data-client-tabs]").addEventListener("keydown",
+      arrowNav(clientTabs, function (tab) { setClient(tab.getAttribute("data-client-target"), true); }));
 
-    var available = langs();
-    var remembered = readPref(SHELL_KEY);
-    var initial = available.indexOf(remembered) >= 0 ? remembered : null;
-    if (initial === null && prefersPowerShell) {
-      available.forEach(function (lang) {
-        if (initial === null && looksLikePowerShell(lang)) initial = lang;
-      });
-    }
-    select(initial === null ? available[0] : initial, false);
+    // Restore remembered choices, falling back to the defaults above.
+    var rememberedModel = readPref(MODEL_KEY);
+    if (rememberedModel) setModel(rememberedModel, false);
+    var rememberedClient = readPref(CLIENT_KEY);
+    if (rememberedClient) setClient(rememberedClient, false);
+
+    apply();
   });
 
   /* ---- user menu -------------------------------------------------------- */
