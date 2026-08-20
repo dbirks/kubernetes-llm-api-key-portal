@@ -125,9 +125,11 @@ func run() error {
 		SecureCookies:   secureCookies,
 		DevMode:         cfg.DevFakeAuth,
 		Photos:          photoStore(photos),
+		GrafanaURL:      cfg.GrafanaURL,
 		Onboarding: onboarding.Params{
 			BaseURL:   cfg.InferenceBaseURL.String(),
 			Model:     cfg.DefaultModel,
+			Models:    onboardingModels(cfg.OnboardingModels),
 			BrandName: brandData.Name,
 		},
 	})
@@ -136,6 +138,24 @@ func run() error {
 	}
 
 	return serve(app, cfg, log)
+}
+
+// onboardingModels maps the validated config catalog onto the onboarding
+// package's own type, keeping that package free of a config dependency.
+func onboardingModels(in []config.OnboardingModel) []onboarding.Model {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]onboarding.Model, 0, len(in))
+	for _, m := range in {
+		out = append(out, onboarding.Model{
+			ID:    m.ID,
+			Label: m.Label,
+			Kind:  onboarding.Kind(m.Kind),
+			Path:  m.Path,
+		})
+	}
+	return out
 }
 
 func buildKeyStore(cfg *config.Config, log *slog.Logger) (keystore.KeyStore, error) {

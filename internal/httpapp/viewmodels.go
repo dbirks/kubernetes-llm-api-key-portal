@@ -50,6 +50,10 @@ type Page struct {
 	// "keys", "models", "howitworks", or "" when there is nothing to highlight,
 	// which is the case for the signed-out and error pages.
 	ActiveNav string
+
+	// GrafanaURL is the metrics dashboard link, or "" when none is configured.
+	// When set, the header shows a "Metrics" link.
+	GrafanaURL string
 }
 
 // LandingPage backs the signed-out landing page.
@@ -140,7 +144,11 @@ type KeyView struct {
 type AccountPage struct {
 	Page
 	Keys   []KeyView
-	Guides []onboarding.Guide
+	Setups []onboarding.ModelSetup
+
+	// Catalog is the compact "endpoints you can call" summary shown on the
+	// account page, independent of the live /models status list.
+	Catalog []onboarding.ModelInfo
 
 	// EnvVar is the environment variable name the guides use, so the page can
 	// mention it outside a code block.
@@ -168,7 +176,7 @@ type CreatedKeyPage struct {
 	Page
 	KeyName string
 	Secret  string
-	Guides  []onboarding.Guide
+	Setups  []onboarding.ModelSetup
 	EnvVar  string
 }
 

@@ -6,6 +6,7 @@ package config
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -67,12 +68,44 @@ type Config struct {
 	// snippets. It is a convenience, not a restriction: a client may set the
 	// OpenAI "model" field to any name the gateway routes — see the /models
 	// page for the live list. Empty leaves the snippets without a preset.
+	//
+	// It is the single-model fallback: when OnboardingModels is set, that list
+	// drives the setup picker instead.
 	DefaultModel     string
 	InferenceBaseURL *url.URL
+
+	// OnboardingModels is the catalog the setup picker offers. Each entry can
+	// sit on its own base path, so a model served under a subpath gets snippets
+	// that point at the right URL. Empty falls back to DefaultModel on the
+	// portal origin.
+	OnboardingModels []OnboardingModel
+
+	// GrafanaURL, when set, adds a metrics link to the header and account page.
+	// It may include a path (e.g. https://host/grafana).
+	GrafanaURL string
 
 	Brand BrandConfig
 
 	DevFakeAuth bool
+}
+
+// OnboardingModel is one servable model the setup picker offers. It is parsed
+// from the ONBOARDING_MODELS JSON array.
+type OnboardingModel struct {
+	// ID is the value a client sends in the "model" field. Required.
+	ID string `json:"id"`
+
+	// Label is the human-facing name shown on the picker. Defaults to ID.
+	Label string `json:"label"`
+
+	// Kind classifies the model: "coding" or "reasoning" (or empty). A
+	// reasoning model's snippets carry a max_tokens reminder.
+	Kind string `json:"kind"`
+
+	// Path is the base-path segment the model is served under, before "/v1",
+	// with a leading slash and no trailing one — "" for the portal origin,
+	// "/muse" for a model routed under a subpath.
+	Path string `json:"path"`
 }
 
 // BrandConfig is the raw, unvalidated branding input. internal/brand turns this
@@ -197,6 +230,22 @@ func Load() (*Config, error) {
 		cfg.InferenceBaseURL = cfg.PublicBaseURL
 	}
 
+	// Onboarding model catalog for the setup picker.
+	if models, err := parseOnboardingModels(os.Getenv("ONBOARDING_MODELS")); err != nil {
+		fail("ONBOARDING_MODELS: %w", err)
+	} else {
+		cfg.OnboardingModels = models
+	}
+
+	// Optional Grafana link.
+	if raw := strings.TrimSpace(os.Getenv("GRAFANA_URL")); raw != "" {
+		if u, err := url.Parse(raw); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			fail("GRAFANA_URL must be an absolute http(s) URL, got %q", raw)
+		} else {
+			cfg.GrafanaURL = strings.TrimRight(raw, "/")
+		}
+	}
+
 	// Keystore mode.
 	switch mode := KeystoreMode(lookupDefault("KEYSTORE_MODE", string(KeystoreMemory))); mode {
 	case KeystoreMemory, KeystoreKubernetes:
@@ -318,6 +367,39 @@ func parseSessionKeys(raw string) ([][]byte, error) {
 		return nil, errors.New("required; generate one with: openssl rand -base64 32")
 	}
 	return keys, nil
+}
+
+// parseOnboardingModels reads the ONBOARDING_MODELS JSON array. An empty value
+// is valid and means "fall back to DEFAULT_MODEL". Each entry must have an id;
+// a path must be empty or start with a slash; a kind must be one the picker
+// understands.
+func parseOnboardingModels(raw string) ([]OnboardingModel, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, nil
+	}
+	var models []OnboardingModel
+	if err := json.Unmarshal([]byte(raw), &models); err != nil {
+		return nil, fmt.Errorf("not valid JSON: %w", err)
+	}
+	for i := range models {
+		models[i].ID = strings.TrimSpace(models[i].ID)
+		models[i].Label = strings.TrimSpace(models[i].Label)
+		models[i].Path = strings.TrimSpace(models[i].Path)
+		models[i].Kind = strings.TrimSpace(models[i].Kind)
+		if models[i].ID == "" {
+			return nil, fmt.Errorf("model %d is missing an id", i+1)
+		}
+		if models[i].Path != "" && !strings.HasPrefix(models[i].Path, "/") {
+			return nil, fmt.Errorf("model %q path must start with a slash, got %q", models[i].ID, models[i].Path)
+		}
+		switch models[i].Kind {
+		case "", "coding", "reasoning":
+		default:
+			return nil, fmt.Errorf("model %q kind must be \"coding\", \"reasoning\", or empty, got %q", models[i].ID, models[i].Kind)
+		}
+	}
+	return models, nil
 }
 
 func decodeBase64(s string) ([]byte, error) {

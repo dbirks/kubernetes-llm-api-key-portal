@@ -1,0 +1,22 @@
+id: curl
+name: curl
+
+A one-shot request to confirm your key and llm.birks.dev are reachable, with no client to install.
+
+--- commands (bash) ---
+export LLM_BIRKS_DEV_API_KEY="YOUR_API_KEY"
+
+curl https://llm.birks.dev/v1/chat/completions \
+  -H "Authorization: Bearer $LLM_BIRKS_DEV_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "model": "Qwen3-Coder-30B",
+        "messages": [{"role": "user", "content": "Say hello in one sentence."}]
+      }'
+
+--- notes ---
+- A 200 with a chat completion means the key, gateway, and model are all working.
+- Swap "Qwen3-Coder-30B" for any name from the model list to try a different model.
+
+--- agent prompt ---
+Configure curl on this machine to use my self-hosted llm.birks.dev endpoint at https://llm.birks.dev. Send a POST to https://llm.birks.dev/v1/chat/completions with the model "Qwen3-Coder-30B" and the API key from my environment as a Bearer token. Use the model "Qwen3-Coder-30B". Read the API key from the LLM_BIRKS_DEV_API_KEY environment variable. Do not write the key itself into any file in a git repository, and do not print it. Preserve my existing unrelated configuration.

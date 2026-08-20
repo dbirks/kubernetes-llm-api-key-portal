@@ -16,12 +16,13 @@ import (
 // page builds the view model every template embeds.
 func (a *App) page(w http.ResponseWriter, r *http.Request, title string) Page {
 	p := Page{
-		Brand:     a.brand,
-		Title:     title,
-		RequestID: RequestIDFrom(r.Context()),
-		DevMode:   a.devMode,
-		Models:    a.catalog != nil,
-		Flashes:   a.sealer.TakeFlash(w, r),
+		Brand:      a.brand,
+		Title:      title,
+		RequestID:  RequestIDFrom(r.Context()),
+		DevMode:    a.devMode,
+		Models:     a.catalog != nil,
+		GrafanaURL: a.grafanaURL,
+		Flashes:    a.sealer.TakeFlash(w, r),
 	}
 	if u, ok := auth.UserFrom(r.Context()); ok {
 		p.User = &User{
@@ -227,7 +228,8 @@ func (a *App) handleAccount(w http.ResponseWriter, r *http.Request) {
 	a.mustRender(w, r, http.StatusOK, "account.html", AccountPage{
 		Page:          a.page(w, r, "Account").withNav("keys"),
 		Keys:          views,
-		Guides:        onboarding.Guides(params),
+		Setups:        onboarding.Setups(params),
+		Catalog:       onboarding.Catalog(params),
 		EnvVar:        onboarding.EnvVar(params),
 		SelectedKeyID: selectedKey(views, r.URL.Query().Get("key")),
 	})
@@ -292,7 +294,7 @@ func (a *App) handleCreateKey(w http.ResponseWriter, r *http.Request) {
 		Page:    a.page(w, r, "API key created").withNav("keys"),
 		KeyName: created.Name,
 		Secret:  created.Secret,
-		Guides:  onboarding.Guides(params),
+		Setups:  onboarding.Setups(params),
 		EnvVar:  onboarding.EnvVar(params),
 	})
 }
