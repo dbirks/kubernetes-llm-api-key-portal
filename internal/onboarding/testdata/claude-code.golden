@@ -1,12 +1,12 @@
 id: claude-code
 name: Claude Code
 
-Point Claude Code at llm.birks.dev using gateway bearer authentication. The base URL is the Anthropic surface (no /v1, since Claude Code appends /v1/messages itself), so no translation layer is needed.
+Point Claude Code at llm.birks.dev's Anthropic-compatible surface at /anthropic. Claude Code appends /v1/messages itself, and the gateway translates between the Anthropic and OpenAI APIs, so every served model is reachable on this one URL.
 
 --- commands (sh) ---
 export LLM_BIRKS_DEV_API_KEY="YOUR_API_KEY"
 
-export ANTHROPIC_BASE_URL="https://llm.birks.dev"
+export ANTHROPIC_BASE_URL="https://llm.birks.dev/anthropic"
 export ANTHROPIC_AUTH_TOKEN="$LLM_BIRKS_DEV_API_KEY"
 export ANTHROPIC_DEFAULT_OPUS_MODEL="Qwen3-Coder-30B"
 export ANTHROPIC_DEFAULT_SONNET_MODEL="Qwen3-Coder-30B"
@@ -17,7 +17,7 @@ claude
 --- commands (PowerShell) ---
 $env:LLM_BIRKS_DEV_API_KEY = "YOUR_API_KEY"
 
-$env:ANTHROPIC_BASE_URL = "https://llm.birks.dev"
+$env:ANTHROPIC_BASE_URL = "https://llm.birks.dev/anthropic"
 $env:ANTHROPIC_AUTH_TOKEN = $env:LLM_BIRKS_DEV_API_KEY
 $env:ANTHROPIC_DEFAULT_OPUS_MODEL = "Qwen3-Coder-30B"
 $env:ANTHROPIC_DEFAULT_SONNET_MODEL = "Qwen3-Coder-30B"
@@ -28,7 +28,8 @@ claude
 --- notes ---
 - Add the exports to your shell profile to make them permanent.
 - The three model variables map Claude Code's Opus, Sonnet, and Haiku slots onto the single served model, so every mode routes to the same place.
+- ANTHROPIC_BASE_URL ends in /anthropic (not /v1): that path is what tells the gateway to translate Anthropic requests. Claude Code appends /v1/messages on its own.
 - ANTHROPIC_AUTH_TOKEN is the gateway bearer token. Leave ANTHROPIC_API_KEY unset so it cannot take precedence.
 
 --- agent prompt ---
-Configure Claude Code on this machine to use my self-hosted llm.birks.dev endpoint at https://llm.birks.dev. Set ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN, and the ANTHROPIC_DEFAULT_{OPUS,SONNET,HAIKU}_MODEL variables in my shell profile. Use the model "Qwen3-Coder-30B". Read the API key from the LLM_BIRKS_DEV_API_KEY environment variable. Do not write the key itself into any file in a git repository, and do not print it. Preserve my existing unrelated configuration.
+Configure Claude Code on this machine to use my self-hosted llm.birks.dev endpoint at https://llm.birks.dev/anthropic. Set ANTHROPIC_BASE_URL to https://llm.birks.dev/anthropic, ANTHROPIC_AUTH_TOKEN, and the ANTHROPIC_DEFAULT_{OPUS,SONNET,HAIKU}_MODEL variables in my shell profile. Use the model "Qwen3-Coder-30B". Read the API key from the LLM_BIRKS_DEV_API_KEY environment variable. Do not write the key itself into any file in a git repository, and do not print it. Preserve my existing unrelated configuration.

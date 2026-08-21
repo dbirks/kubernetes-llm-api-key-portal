@@ -109,12 +109,20 @@ func TestModelPathIsAppliedToBaseURL(t *testing.T) {
 	if setups[1].APIBase != "https://llm.birks.dev/muse/v1" {
 		t.Errorf("muse APIBase = %q", setups[1].APIBase)
 	}
-	// Every muse guide must route under the /muse path (Claude Code uses the
-	// bare base and appends /v1 itself; the OpenAI-style guides carry /muse/v1),
-	// and every one must carry the reasoning note.
+	// Every OpenAI-style muse guide must route under the /muse path, and every
+	// guide must carry the reasoning note. Claude Code is the exception: it uses
+	// the shared Anthropic surface at /anthropic for every model, routing by the
+	// request body's model field rather than a per-model base path.
 	for _, g := range setups[1].Guides {
 		text := render(g)
-		if !strings.Contains(text, "llm.birks.dev/muse") {
+		if g.ID == "claude-code" {
+			if !strings.Contains(text, "llm.birks.dev/anthropic") {
+				t.Errorf("claude-code guide does not use the /anthropic surface:\n%s", text)
+			}
+			if strings.Contains(text, "llm.birks.dev/muse") {
+				t.Errorf("claude-code guide must not carry the per-model /muse path:\n%s", text)
+			}
+		} else if !strings.Contains(text, "llm.birks.dev/muse") {
 			t.Errorf("muse guide %q does not route under /muse:\n%s", g.ID, text)
 		}
 		if !strings.Contains(text, "reasoning model") {
@@ -355,6 +363,11 @@ func TestClaudeCodeAuthAndModelSlots(t *testing.T) {
 	// /v1/messages itself.
 	if strings.Contains(text, "ANTHROPIC_BASE_URL=\"https://llm.birks.dev/v1\"") {
 		t.Error("claude-code ANTHROPIC_BASE_URL must not include /v1")
+	}
+	// It must point at the gateway's Anthropic surface at /anthropic (the path
+	// that triggers translation), not the bare origin.
+	if !strings.Contains(text, "ANTHROPIC_BASE_URL=\"https://llm.birks.dev/anthropic\"") {
+		t.Errorf("claude-code ANTHROPIC_BASE_URL must be the /anthropic surface:\n%s", text)
 	}
 }
 

@@ -80,7 +80,7 @@ func claudeCode(r resolved) Guide {
 	sh := strings.Join([]string{
 		keyExport(r),
 		"",
-		exportLine("ANTHROPIC_BASE_URL", r.BaseURL),
+		exportLine("ANTHROPIC_BASE_URL", r.AnthropicBase),
 		fmt.Sprintf("export ANTHROPIC_AUTH_TOKEN=\"$%s\"", r.EnvVar),
 		exportLine("ANTHROPIC_DEFAULT_OPUS_MODEL", r.Model),
 		exportLine("ANTHROPIC_DEFAULT_SONNET_MODEL", r.Model),
@@ -91,7 +91,7 @@ func claudeCode(r resolved) Guide {
 	ps := strings.Join([]string{
 		keyExportPS(r),
 		"",
-		psSetLine("ANTHROPIC_BASE_URL", r.BaseURL),
+		psSetLine("ANTHROPIC_BASE_URL", r.AnthropicBase),
 		fmt.Sprintf("$env:ANTHROPIC_AUTH_TOKEN = $env:%s", r.EnvVar),
 		psSetLine("ANTHROPIC_DEFAULT_OPUS_MODEL", r.Model),
 		psSetLine("ANTHROPIC_DEFAULT_SONNET_MODEL", r.Model),
@@ -103,15 +103,16 @@ func claudeCode(r resolved) Guide {
 	return Guide{
 		ID:          "claude-code",
 		Name:        "Claude Code",
-		Description: fmt.Sprintf("Point Claude Code at %s using gateway bearer authentication. The base URL is the Anthropic surface (no /v1, since Claude Code appends /v1/messages itself), so no translation layer is needed.", r.BrandName),
+		Description: fmt.Sprintf("Point Claude Code at %s's Anthropic-compatible surface at /anthropic. Claude Code appends /v1/messages itself, and the gateway translates between the Anthropic and OpenAI APIs, so every served model is reachable on this one URL.", r.BrandName),
 		Commands:    []GuideBlock{shBlock(sh), psBlock(ps)},
 		Notes: []string{
 			"Add the exports to your shell profile to make them permanent.",
 			"The three model variables map Claude Code's Opus, Sonnet, and Haiku slots onto the single served model, so every mode routes to the same place.",
+			"ANTHROPIC_BASE_URL ends in /anthropic (not /v1): that path is what tells the gateway to translate Anthropic requests. Claude Code appends /v1/messages on its own.",
 			"ANTHROPIC_AUTH_TOKEN is the gateway bearer token. Leave ANTHROPIC_API_KEY unset so it cannot take precedence.",
 		},
-		AgentPrompt: agentPrompt(r, "Claude Code",
-			"Set ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN, and the ANTHROPIC_DEFAULT_{OPUS,SONNET,HAIKU}_MODEL variables in my shell profile."),
+		AgentPrompt: agentPromptFor(r, r.AnthropicBase, "Claude Code",
+			fmt.Sprintf("Set ANTHROPIC_BASE_URL to %s, ANTHROPIC_AUTH_TOKEN, and the ANTHROPIC_DEFAULT_{OPUS,SONNET,HAIKU}_MODEL variables in my shell profile.", r.AnthropicBase)),
 	}
 }
 
@@ -397,8 +398,16 @@ func crush(r resolved) Guide {
 // key" constraint, because the most likely way this credential leaks is an
 // agent helpfully writing it into a tracked config file.
 func agentPrompt(r resolved, client, specifics string) string {
+	return agentPromptFor(r, r.BaseURL, client, specifics)
+}
+
+// agentPromptFor is agentPrompt with an explicit endpoint, for a client whose
+// endpoint is not the model's OpenAI-style base URL. Claude Code uses it to
+// name the shared Anthropic surface (origin + /anthropic) rather than the
+// per-model base path.
+func agentPromptFor(r resolved, endpoint, client, specifics string) string {
 	return strings.Join([]string{
-		fmt.Sprintf("Configure %s on this machine to use my self-hosted %s endpoint at %s.", client, r.BrandName, r.BaseURL),
+		fmt.Sprintf("Configure %s on this machine to use my self-hosted %s endpoint at %s.", client, r.BrandName, endpoint),
 		specifics,
 		fmt.Sprintf("Use the model %q.", r.Model),
 		fmt.Sprintf("Read the API key from the %s environment variable. Do not write the key itself into any file in a git repository, and do not print it.", r.EnvVar),

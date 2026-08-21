@@ -118,15 +118,21 @@ type Guide struct {
 // resolved is Params + one Model with defaults applied and derived names
 // computed.
 type resolved struct {
-	BaseURL    string // origin + model path, e.g. https://host or https://host/muse
-	APIBase    string // BaseURL + "/v1"
-	Model      string
-	Label      string // human-facing model name, falls back to Model
-	Kind       Kind
-	BrandName  string
-	Key        string
-	EnvVar     string // e.g. BIRKS_AI_API_KEY
-	ProviderID string // e.g. birks-ai
+	BaseURL string // origin + model path, e.g. https://host or https://host/muse
+	APIBase string // BaseURL + "/v1"
+	// AnthropicBase is the gateway's shared Anthropic-compatible surface,
+	// origin + "/anthropic" (no model path). Every model is reachable here on
+	// one URL, routed by the request body's model field; the gateway translates
+	// between the Anthropic and OpenAI APIs. Claude Code appends /v1/messages
+	// itself, so this carries no /v1 suffix.
+	AnthropicBase string
+	Model         string
+	Label         string // human-facing model name, falls back to Model
+	Kind          Kind
+	BrandName     string
+	Key           string
+	EnvVar        string // e.g. BIRKS_AI_API_KEY
+	ProviderID    string // e.g. birks-ai
 }
 
 // origin returns the trimmed inference origin, with a placeholder when unset so
@@ -163,15 +169,16 @@ func (p Params) resolve(m Model) resolved {
 		key = PlaceholderKey
 	}
 	return resolved{
-		BaseURL:    base,
-		APIBase:    base + "/v1",
-		Model:      model,
-		Label:      m.resolveLabel(),
-		Kind:       m.Kind,
-		BrandName:  brand,
-		Key:        key,
-		EnvVar:     envVarName(brand),
-		ProviderID: providerID(brand),
+		BaseURL:       base,
+		APIBase:       base + "/v1",
+		AnthropicBase: p.origin() + "/anthropic",
+		Model:         model,
+		Label:         m.resolveLabel(),
+		Kind:          m.Kind,
+		BrandName:     brand,
+		Key:           key,
+		EnvVar:        envVarName(brand),
+		ProviderID:    providerID(brand),
 	}
 }
 
