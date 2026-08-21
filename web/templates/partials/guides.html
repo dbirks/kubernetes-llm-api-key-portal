@@ -44,6 +44,13 @@
         {{end}}
       </ul>
     </div>
+    <div class="picker-axis" data-shell-axis>
+      <span class="picker-axis-label" id="picker-shell-label">Shell</span>
+      <ul class="segmented" data-shell-tabs role="tablist" aria-labelledby="picker-shell-label">
+        <li><button type="button" class="guide-tab" data-shell-target="sh">sh</button></li>
+        <li><button type="button" class="guide-tab" data-shell-target="powershell">PowerShell</button></li>
+      </ul>
+    </div>
   </div>
 
   <div class="picker-panels">
@@ -74,7 +81,7 @@
         {{end}}
 
         {{range $i, $block := $g.Commands}}
-        <figure class="snippet">
+        <figure class="snippet"{{if $block.Shell}} data-shell="{{$block.Shell}}"{{end}}>
           <figcaption>
             <span class="snippet-path">{{$block.Language}}</span>
             <span class="snippet-actions">

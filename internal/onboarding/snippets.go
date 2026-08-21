@@ -2,6 +2,7 @@ package onboarding
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -10,18 +11,73 @@ import (
 // one is covered by a golden test: when a format changes, update the builder
 // here and run `go test ./internal/onboarding -update` to review the diff.
 
-// exportLine renders a shell export, quoting the value.
+// Shell identifiers used to tag GuideBlocks so the account page's sh/PowerShell
+// toggle can show one shell at a time. A block with an empty Shell (a config
+// file's contents, Cursor's GUI values) is shell-agnostic and always shows.
+const (
+	shellSh = "sh"
+	shellPS = "powershell"
+	labelSh = "sh"
+	labelPS = "PowerShell"
+)
+
+// exportLine renders a POSIX shell export, quoting the value.
 func exportLine(name, value string) string {
 	return fmt.Sprintf("export %s=%q", name, value)
 }
 
-// keyExport is the line that puts the credential in the environment. Every
+// psSetLine renders a PowerShell environment assignment. PowerShell only
+// interpolates inside double quotes, and none of the values here (URLs, model
+// names, keys, derived identifiers) contain a `$` or a `"`, so a double-quoted
+// literal is safe and reads the same as the sh form.
+func psSetLine(name, value string) string {
+	return fmt.Sprintf("$env:%s = %q", name, value)
+}
+
+// keyExport is the sh line that puts the credential in the environment. Every
 // guide leads with it, so the credential lives in exactly one place per client
 // rather than being pasted into a config file that might get committed.
 func keyExport(r resolved) string { return exportLine(r.EnvVar, r.Key) }
 
+// keyExportPS is the PowerShell equivalent of keyExport.
+func keyExportPS(r resolved) string { return psSetLine(r.EnvVar, r.Key) }
+
+// shBlock and psBlock tag a snippet with its shell so the toggle can pick it.
+func shBlock(content string) GuideBlock {
+	return GuideBlock{Language: labelSh, Shell: shellSh, Content: content}
+}
+func psBlock(content string) GuideBlock {
+	return GuideBlock{Language: labelPS, Shell: shellPS, Content: content}
+}
+
+// contextWindow is the shared context length advertised in config files that
+// want one. All six models expose a large window; the exact figure is a hint
+// the client uses for its own budgeting, not a hard limit the gateway enforces.
+const contextWindow = 262144
+
+// maxTokensFor is the default completion budget a config file suggests. A
+// reasoning model spends tokens thinking before it answers, so it gets more
+// headroom or the visible reply can be cut off mid-thought.
+func maxTokensFor(r resolved) int {
+	if r.Kind == KindReasoning {
+		return 16384
+	}
+	return 8192
+}
+
+// launchBlocks builds the sh + PowerShell command pair a config-file client
+// needs: export the credential, then run the tool. The file itself is
+// shell-agnostic and rendered separately; only the credential export differs
+// between shells.
+func launchBlocks(r resolved, launch string) []GuideBlock {
+	return []GuideBlock{
+		shBlock(keyExport(r) + "\n\n" + launch),
+		psBlock(keyExportPS(r) + "\n\n" + launch),
+	}
+}
+
 func claudeCode(r resolved) Guide {
-	commands := strings.Join([]string{
+	sh := strings.Join([]string{
 		keyExport(r),
 		"",
 		exportLine("ANTHROPIC_BASE_URL", r.BaseURL),
@@ -32,12 +88,23 @@ func claudeCode(r resolved) Guide {
 		"",
 		"claude",
 	}, "\n")
+	ps := strings.Join([]string{
+		keyExportPS(r),
+		"",
+		psSetLine("ANTHROPIC_BASE_URL", r.BaseURL),
+		fmt.Sprintf("$env:ANTHROPIC_AUTH_TOKEN = $env:%s", r.EnvVar),
+		psSetLine("ANTHROPIC_DEFAULT_OPUS_MODEL", r.Model),
+		psSetLine("ANTHROPIC_DEFAULT_SONNET_MODEL", r.Model),
+		psSetLine("ANTHROPIC_DEFAULT_HAIKU_MODEL", r.Model),
+		"",
+		"claude",
+	}, "\n")
 
 	return Guide{
 		ID:          "claude-code",
 		Name:        "Claude Code",
-		Description: fmt.Sprintf("Point Claude Code at %s using gateway bearer authentication. The endpoint implements the Anthropic Messages API, so no translation layer is needed.", r.BrandName),
-		Commands:    []GuideBlock{{Language: "bash", Content: commands}},
+		Description: fmt.Sprintf("Point Claude Code at %s using gateway bearer authentication. The base URL is the Anthropic surface (no /v1 — Claude Code appends /v1/messages itself), so no translation layer is needed.", r.BrandName),
+		Commands:    []GuideBlock{shBlock(sh), psBlock(ps)},
 		Notes: []string{
 			"Add the exports to your shell profile to make them permanent.",
 			"The three model variables map Claude Code's Opus, Sonnet, and Haiku slots onto the single served model, so every mode routes to the same place.",
@@ -49,21 +116,27 @@ func claudeCode(r resolved) Guide {
 }
 
 func openaiCompatible(r resolved) Guide {
-	commands := strings.Join([]string{
+	sh := strings.Join([]string{
 		keyExport(r),
 		"",
 		exportLine("OPENAI_BASE_URL", r.APIBase),
 		fmt.Sprintf("export OPENAI_API_KEY=\"$%s\"", r.EnvVar),
+	}, "\n")
+	ps := strings.Join([]string{
+		keyExportPS(r),
+		"",
+		psSetLine("OPENAI_BASE_URL", r.APIBase),
+		fmt.Sprintf("$env:OPENAI_API_KEY = $env:%s", r.EnvVar),
 	}, "\n")
 
 	return Guide{
 		ID:          "openai",
 		Name:        "OpenAI-compatible",
 		Description: fmt.Sprintf("Point any OpenAI-compatible client or SDK at %s. These are the two variables every OpenAI SDK already reads — the official Python and Node clients, LiteLLM, LangChain, LlamaIndex, and most tools that take a custom base URL.", r.BrandName),
-		Commands:    []GuideBlock{{Language: "bash", Content: commands}},
+		Commands:    []GuideBlock{shBlock(sh), psBlock(ps)},
 		Notes: []string{
 			fmt.Sprintf("Set the request's \"model\" field to %q. The same key reaches every model — only the base URL and model name change.", r.Model),
-			"The endpoint serves the OpenAI Chat Completions and Responses APIs, so /v1/chat/completions and /v1/responses both work.",
+			"The endpoint speaks the OpenAI Chat Completions API at /v1/chat/completions, which is what these clients use.",
 			fmt.Sprintf("OPENAI_API_KEY reads from $%s so the credential stays in your environment rather than a file.", r.EnvVar),
 		},
 		AgentPrompt: agentPrompt(r, "an OpenAI-compatible client",
@@ -103,9 +176,16 @@ func cursor(r resolved) Guide {
 }
 
 func curlGuide(r resolved) Guide {
+	maxTokens := 256
+	if r.Kind == KindReasoning {
+		// A reasoning model spends tokens thinking before it replies, so a raw
+		// request needs headroom or the visible answer is truncated.
+		maxTokens = 4096
+	}
+
 	// A single-quoted body spans multiple lines in the shell, so the JSON reads
 	// naturally without escaping.
-	lines := []string{
+	shLines := []string{
 		keyExport(r),
 		"",
 		"curl " + r.APIBase + "/chat/completions \\",
@@ -113,23 +193,30 @@ func curlGuide(r resolved) Guide {
 		"  -H \"Content-Type: application/json\" \\",
 		"  -d '{",
 		"        \"model\": " + jsonString(r.Model) + ",",
-	}
-	if r.Kind == KindReasoning {
-		// A reasoning model spends tokens thinking before it replies, so a raw
-		// request needs headroom or the visible answer is truncated.
-		lines = append(lines, "        \"max_tokens\": 2048,")
-	}
-	lines = append(lines,
+		fmt.Sprintf("        \"max_tokens\": %d,", maxTokens),
 		"        \"messages\": [{\"role\": \"user\", \"content\": \"Say hello in one sentence.\"}]",
 		"      }'",
-	)
-	commands := strings.Join(lines, "\n")
+	}
+	sh := strings.Join(shLines, "\n")
+
+	// PowerShell: curl.exe (not the Invoke-WebRequest alias), backtick line
+	// continuations, and a single-quoted JSON body so nothing is interpolated.
+	// The Authorization header is double-quoted so $env: expands.
+	psLines := []string{
+		keyExportPS(r),
+		"",
+		"curl.exe " + r.APIBase + "/chat/completions `",
+		fmt.Sprintf("  -H \"Authorization: Bearer $env:%s\" `", r.EnvVar),
+		"  -H \"Content-Type: application/json\" `",
+		"  -d '{\"model\": " + jsonString(r.Model) + ", \"max_tokens\": " + strconv.Itoa(maxTokens) + ", \"messages\": [{\"role\": \"user\", \"content\": \"Say hello in one sentence.\"}]}'",
+	}
+	ps := strings.Join(psLines, "\n")
 
 	return Guide{
 		ID:          "curl",
 		Name:        "curl",
 		Description: fmt.Sprintf("A one-shot request to confirm your key and %s are reachable, with no client to install.", r.BrandName),
-		Commands:    []GuideBlock{{Language: "bash", Content: commands}},
+		Commands:    []GuideBlock{shBlock(sh), psBlock(ps)},
 		Notes: []string{
 			"A 200 with a chat completion means the key, gateway, and model are all working.",
 			fmt.Sprintf("Swap %q for any name from the model list to try a different model.", r.Model),
@@ -140,18 +227,26 @@ func curlGuide(r resolved) Guide {
 }
 
 func pi(r resolved) Guide {
-	// Built with the JSON encoder so an operator brand name containing quotes
-	// cannot produce a broken config file.
+	// earendil-works/pi (@earendil-works/pi-coding-agent), configured at
+	// ~/.pi/agent/models.json. api "openai-completions" is the Chat Completions
+	// wire format the gateway serves; apiKey "$VAR" expands from the environment
+	// at run time so the credential stays out of the file. Built with the JSON
+	// encoder so an operator brand name containing quotes cannot break the file.
 	content := strings.Join([]string{
 		"{",
 		"  \"providers\": {",
 		"    " + jsonString(r.ProviderID) + ": {",
 		"      \"baseUrl\": " + jsonString(r.APIBase) + ",",
 		"      \"api\": \"openai-completions\",",
-		"      \"apiKey\": " + jsonString(r.EnvVar) + ",",
-		"      \"authHeader\": true,",
+		"      \"apiKey\": " + jsonString("$"+r.EnvVar) + ",",
 		"      \"models\": [",
-		"        { \"id\": " + jsonString(r.Model) + " }",
+		"        {",
+		"          \"id\": " + jsonString(r.Model) + ",",
+		"          \"name\": " + jsonString(r.Label) + ",",
+		"          \"reasoning\": " + strconv.FormatBool(r.Kind == KindReasoning) + ",",
+		"          \"contextWindow\": " + strconv.Itoa(contextWindow) + ",",
+		"          \"maxTokens\": " + strconv.Itoa(maxTokensFor(r)),
+		"        }",
 		"      ]",
 		"    }",
 		"  }",
@@ -161,20 +256,20 @@ func pi(r resolved) Guide {
 	return Guide{
 		ID:          "pi",
 		Name:        "Pi",
-		Description: fmt.Sprintf("Register %s as a custom OpenAI-compatible provider in Pi's model configuration.", r.BrandName),
+		Description: fmt.Sprintf("Register %s as a custom OpenAI-compatible provider in Pi's model configuration (earendil-works/pi, ~/.pi/agent/models.json).", r.BrandName),
 		Files: []GuideFile{{
 			Path:     "~/.pi/agent/models.json",
 			Language: "json",
 			Content:  content,
 		}},
-		Commands: []GuideBlock{{Language: "bash", Content: keyExport(r) + "\n\npi"}},
+		Commands: launchBlocks(r, "pi"),
 		Notes: []string{
-			fmt.Sprintf("The apiKey field names an environment variable, not the credential itself, so %s stays out of the file.", r.EnvVar),
-			"authHeader: true makes Pi send Authorization: Bearer, which is what the gateway expects.",
+			fmt.Sprintf("The $%s form tells Pi to expand the credential from your environment, so the key never lands in the file.", r.EnvVar),
+			"The openai-completions API sends Authorization: Bearer, which is what the gateway expects.",
 			"If you already have a models.json, merge the providers entry rather than replacing the file.",
 		},
 		AgentPrompt: agentPrompt(r, "Pi",
-			"Add a custom provider to ~/.pi/agent/models.json using the openai-completions API with authHeader enabled, merging with any existing providers."),
+			"Add a custom provider to ~/.pi/agent/models.json using the openai-completions API, expanding the API key from an environment variable, merging with any existing providers."),
 	}
 }
 
@@ -192,7 +287,7 @@ func opencode(r resolved) Guide {
 		"      },",
 		"      \"models\": {",
 		"        " + jsonString(r.Model) + ": {",
-		"          \"name\": " + jsonString(r.Model),
+		"          \"name\": " + jsonString(r.Label),
 		"        }",
 		"      }",
 		"    }",
@@ -209,7 +304,7 @@ func opencode(r resolved) Guide {
 			Language: "json",
 			Content:  content,
 		}},
-		Commands: []GuideBlock{{Language: "bash", Content: keyExport(r) + "\n\nopencode"}},
+		Commands: launchBlocks(r, "opencode"),
 		Notes: []string{
 			fmt.Sprintf("The {env:%s} placeholder reads the credential from your environment at run time.", r.EnvVar),
 			"OpenCode's provider schema has changed across releases. If this does not load, check the current docs at opencode.ai and report it so the snippet can be updated.",
@@ -241,10 +336,11 @@ func codex(r resolved) Guide {
 			Language: "toml",
 			Content:  content,
 		}},
-		Commands: []GuideBlock{{Language: "bash", Content: keyExport(r) + "\n\ncodex"}},
+		Commands: launchBlocks(r, "codex"),
 		Notes: []string{
 			"env_key names the environment variable Codex reads the credential from.",
-			"Custom Codex providers use the Responses wire format, which the endpoint serves at /v1/responses.",
+			"Recent Codex (0.122+) only supports wire_api = \"responses\"; the older \"chat\" value fails at startup. This provider therefore targets the endpoint's OpenAI Responses API at /v1/responses.",
+			"If Codex errors on startup with a 404 or an unsupported-endpoint message, this model's server build does not expose /v1/responses. Point base_url at a small Responses-to-Chat proxy (e.g. LiteLLM) instead; the other clients here use Chat Completions directly and need no proxy.",
 			"If you already have a config.toml, merge these keys instead of overwriting it.",
 		},
 		AgentPrompt: agentPrompt(r, "Codex",
@@ -264,7 +360,9 @@ func crush(r resolved) Guide {
 		"      \"models\": [",
 		"        {",
 		"          \"id\": " + jsonString(r.Model) + ",",
-		"          \"name\": " + jsonString(r.Model),
+		"          \"name\": " + jsonString(r.Label) + ",",
+		"          \"context_window\": " + strconv.Itoa(contextWindow) + ",",
+		"          \"default_max_tokens\": " + strconv.Itoa(maxTokensFor(r)),
 		"        }",
 		"      ]",
 		"    }",
@@ -281,7 +379,7 @@ func crush(r resolved) Guide {
 			Language: "json",
 			Content:  content,
 		}},
-		Commands: []GuideBlock{{Language: "bash", Content: keyExport(r) + "\n\ncrush"}},
+		Commands: launchBlocks(r, "crush"),
 		Notes: []string{
 			fmt.Sprintf("The $%s form tells Crush to expand the value from your environment.", r.EnvVar),
 			"The openai-compat provider type sends Authorization: Bearer, which is what the gateway expects.",

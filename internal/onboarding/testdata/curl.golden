@@ -3,7 +3,7 @@ name: curl
 
 A one-shot request to confirm your key and llm.birks.dev are reachable, with no client to install.
 
---- commands (bash) ---
+--- commands (sh) ---
 export LLM_BIRKS_DEV_API_KEY="YOUR_API_KEY"
 
 curl https://llm.birks.dev/v1/chat/completions \
@@ -11,8 +11,17 @@ curl https://llm.birks.dev/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
         "model": "Qwen3-Coder-30B",
+        "max_tokens": 256,
         "messages": [{"role": "user", "content": "Say hello in one sentence."}]
       }'
+
+--- commands (PowerShell) ---
+$env:LLM_BIRKS_DEV_API_KEY = "YOUR_API_KEY"
+
+curl.exe https://llm.birks.dev/v1/chat/completions `
+  -H "Authorization: Bearer $env:LLM_BIRKS_DEV_API_KEY" `
+  -H "Content-Type: application/json" `
+  -d '{"model": "Qwen3-Coder-30B", "max_tokens": 256, "messages": [{"role": "user", "content": "Say hello in one sentence."}]}'
 
 --- notes ---
 - A 200 with a chat completion means the key, gateway, and model are all working.

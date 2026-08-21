@@ -974,6 +974,14 @@ hr {
 [data-picker][data-enhanced] .guide-panel.is-active { display: block; }
 [data-picker][data-enhanced] .guide-panel-head { display: none; }
 
+/* Shell toggle. app.js stamps the picker with the chosen shell; a command
+   block tagged with the other shell is hidden. Blocks with no data-shell
+   (config-file contents, Cursor's GUI values) never match and always show.
+   With no JS the picker carries no data-shell attribute, so both the sh and
+   PowerShell blocks stay stacked, each under its own caption. */
+[data-picker][data-shell="sh"] .snippet[data-shell="powershell"],
+[data-picker][data-shell="powershell"] .snippet[data-shell="sh"] { display: none; }
+
 .guide-body { min-width: 0; }
 
 .guide-description {

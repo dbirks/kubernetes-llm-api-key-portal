@@ -1,7 +1,7 @@
 id: pi
 name: Pi
 
-Register llm.birks.dev as a custom OpenAI-compatible provider in Pi's model configuration.
+Register llm.birks.dev as a custom OpenAI-compatible provider in Pi's model configuration (earendil-works/pi, ~/.pi/agent/models.json).
 
 --- file ~/.pi/agent/models.json (json) ---
 {
@@ -9,24 +9,34 @@ Register llm.birks.dev as a custom OpenAI-compatible provider in Pi's model conf
     "llm-birks-dev": {
       "baseUrl": "https://llm.birks.dev/v1",
       "api": "openai-completions",
-      "apiKey": "LLM_BIRKS_DEV_API_KEY",
-      "authHeader": true,
+      "apiKey": "$LLM_BIRKS_DEV_API_KEY",
       "models": [
-        { "id": "Qwen3-Coder-30B" }
+        {
+          "id": "Qwen3-Coder-30B",
+          "name": "Qwen3-Coder-30B",
+          "reasoning": false,
+          "contextWindow": 262144,
+          "maxTokens": 8192
+        }
       ]
     }
   }
 }
 
---- commands (bash) ---
+--- commands (sh) ---
 export LLM_BIRKS_DEV_API_KEY="YOUR_API_KEY"
 
 pi
 
+--- commands (PowerShell) ---
+$env:LLM_BIRKS_DEV_API_KEY = "YOUR_API_KEY"
+
+pi
+
 --- notes ---
-- The apiKey field names an environment variable, not the credential itself, so LLM_BIRKS_DEV_API_KEY stays out of the file.
-- authHeader: true makes Pi send Authorization: Bearer, which is what the gateway expects.
+- The $LLM_BIRKS_DEV_API_KEY form tells Pi to expand the credential from your environment, so the key never lands in the file.
+- The openai-completions API sends Authorization: Bearer, which is what the gateway expects.
 - If you already have a models.json, merge the providers entry rather than replacing the file.
 
 --- agent prompt ---
-Configure Pi on this machine to use my self-hosted llm.birks.dev endpoint at https://llm.birks.dev. Add a custom provider to ~/.pi/agent/models.json using the openai-completions API with authHeader enabled, merging with any existing providers. Use the model "Qwen3-Coder-30B". Read the API key from the LLM_BIRKS_DEV_API_KEY environment variable. Do not write the key itself into any file in a git repository, and do not print it. Preserve my existing unrelated configuration.
+Configure Pi on this machine to use my self-hosted llm.birks.dev endpoint at https://llm.birks.dev. Add a custom provider to ~/.pi/agent/models.json using the openai-completions API, expanding the API key from an environment variable, merging with any existing providers. Use the model "Qwen3-Coder-30B". Read the API key from the LLM_BIRKS_DEV_API_KEY environment variable. Do not write the key itself into any file in a git repository, and do not print it. Preserve my existing unrelated configuration.

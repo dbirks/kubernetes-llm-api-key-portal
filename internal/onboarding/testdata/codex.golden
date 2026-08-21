@@ -13,14 +13,20 @@ base_url = "https://llm.birks.dev/v1"
 env_key = "LLM_BIRKS_DEV_API_KEY"
 wire_api = "responses"
 
---- commands (bash) ---
+--- commands (sh) ---
 export LLM_BIRKS_DEV_API_KEY="YOUR_API_KEY"
+
+codex
+
+--- commands (PowerShell) ---
+$env:LLM_BIRKS_DEV_API_KEY = "YOUR_API_KEY"
 
 codex
 
 --- notes ---
 - env_key names the environment variable Codex reads the credential from.
-- Custom Codex providers use the Responses wire format, which the endpoint serves at /v1/responses.
+- Recent Codex (0.122+) only supports wire_api = "responses"; the older "chat" value fails at startup. This provider therefore targets the endpoint's OpenAI Responses API at /v1/responses.
+- If Codex errors on startup with a 404 or an unsupported-endpoint message, this model's server build does not expose /v1/responses. Point base_url at a small Responses-to-Chat proxy (e.g. LiteLLM) instead; the other clients here use Chat Completions directly and need no proxy.
 - If you already have a config.toml, merge these keys instead of overwriting it.
 
 --- agent prompt ---

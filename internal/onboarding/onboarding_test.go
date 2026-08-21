@@ -256,6 +256,108 @@ func TestAgentPromptWarnsAboutTheCredential(t *testing.T) {
 	}
 }
 
+// blocksByShell splits a guide's command blocks by their Shell tag.
+func blocksByShell(g Guide) (sh, ps, agnostic []GuideBlock) {
+	for _, b := range g.Commands {
+		switch b.Shell {
+		case shellSh:
+			sh = append(sh, b)
+		case shellPS:
+			ps = append(ps, b)
+		default:
+			agnostic = append(agnostic, b)
+		}
+	}
+	return
+}
+
+// Env-based clients (no config file) must offer both an sh and a PowerShell
+// command block so the account page's shell toggle has something to swap.
+func TestEnvBasedGuidesHaveBothShells(t *testing.T) {
+	guides := map[string]Guide{}
+	for _, g := range Guides(testParams()) {
+		guides[g.ID] = g
+	}
+	for _, id := range []string{"claude-code", "openai", "curl"} {
+		g := guides[id]
+		if len(g.Files) != 0 {
+			t.Errorf("%s: expected an env-based guide with no config file, got %d files", id, len(g.Files))
+		}
+		sh, ps, _ := blocksByShell(g)
+		if len(sh) != 1 || len(ps) != 1 {
+			t.Errorf("%s: want exactly one sh and one PowerShell block, got sh=%d ps=%d", id, len(sh), len(ps))
+		}
+	}
+}
+
+// Config-file clients must ship the file contents shell-agnostically (so it is
+// never hidden by the shell toggle) plus one sh and one PowerShell block that
+// export the credential and launch the tool.
+func TestConfigFileGuidesHaveFilePlusPerShellExport(t *testing.T) {
+	guides := map[string]Guide{}
+	for _, g := range Guides(testParams()) {
+		guides[g.ID] = g
+	}
+	for _, id := range []string{"codex", "opencode", "crush", "pi"} {
+		g := guides[id]
+		if len(g.Files) == 0 {
+			t.Errorf("%s: expected a config file", id)
+		}
+		sh, ps, _ := blocksByShell(g)
+		if len(sh) != 1 || len(ps) != 1 {
+			t.Errorf("%s: want one sh and one PowerShell export block, got sh=%d ps=%d", id, len(sh), len(ps))
+		}
+	}
+}
+
+// The PowerShell blocks must actually use PowerShell syntax, not sh syntax, or
+// they will not run in the shell the toggle claims to target.
+func TestPowerShellBlocksUsePowerShellSyntax(t *testing.T) {
+	for _, g := range Guides(testParams()) {
+		_, ps, _ := blocksByShell(g)
+		for _, b := range ps {
+			if strings.Contains(b.Content, "export ") {
+				t.Errorf("%s PowerShell block uses sh `export`:\n%s", g.ID, b.Content)
+			}
+			if !strings.Contains(b.Content, "$env:") {
+				t.Errorf("%s PowerShell block never sets $env::\n%s", g.ID, b.Content)
+			}
+		}
+	}
+}
+
+// Claude Code must use the Anthropic bearer token variable and all three model
+// slots, and must not leak a real Anthropic model via a missing HAIKU slot or a
+// deprecated variable. This is high-risk correction #2 from the reference.
+func TestClaudeCodeAuthAndModelSlots(t *testing.T) {
+	g, ok := GuideByID(testParams(), "claude-code")
+	if !ok {
+		t.Fatal("claude-code guide missing")
+	}
+	text := render(g)
+	for _, want := range []string{
+		"ANTHROPIC_AUTH_TOKEN",
+		"ANTHROPIC_DEFAULT_OPUS_MODEL",
+		"ANTHROPIC_DEFAULT_SONNET_MODEL",
+		"ANTHROPIC_DEFAULT_HAIKU_MODEL",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("claude-code guide is missing %s", want)
+		}
+	}
+	if strings.Contains(text, "ANTHROPIC_API_KEY=") {
+		t.Error("claude-code guide sets ANTHROPIC_API_KEY, which triggers the x-api-key approval prompt; use ANTHROPIC_AUTH_TOKEN")
+	}
+	if strings.Contains(text, "ANTHROPIC_SMALL_FAST_MODEL") {
+		t.Error("claude-code guide uses the deprecated ANTHROPIC_SMALL_FAST_MODEL")
+	}
+	// The Anthropic base URL must not carry a /v1 suffix; Claude Code appends
+	// /v1/messages itself.
+	if strings.Contains(text, "ANTHROPIC_BASE_URL=\"https://llm.birks.dev/v1\"") {
+		t.Error("claude-code ANTHROPIC_BASE_URL must not include /v1")
+	}
+}
+
 func TestGuideByID(t *testing.T) {
 	if _, ok := GuideByID(testParams(), "claude-code"); !ok {
 		t.Error("GuideByID did not find claude-code")

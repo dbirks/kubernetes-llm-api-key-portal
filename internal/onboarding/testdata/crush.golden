@@ -14,15 +14,22 @@ Add llm.birks.dev as an OpenAI-compatible provider in Crush.
       "models": [
         {
           "id": "Qwen3-Coder-30B",
-          "name": "Qwen3-Coder-30B"
+          "name": "Qwen3-Coder-30B",
+          "context_window": 262144,
+          "default_max_tokens": 8192
         }
       ]
     }
   }
 }
 
---- commands (bash) ---
+--- commands (sh) ---
 export LLM_BIRKS_DEV_API_KEY="YOUR_API_KEY"
+
+crush
+
+--- commands (PowerShell) ---
+$env:LLM_BIRKS_DEV_API_KEY = "YOUR_API_KEY"
 
 crush
 

@@ -30,9 +30,17 @@
 
   /* ---- preferences ------------------------------------------------------ */
 
-  // Not security-relevant: these only remember which model and client tab you
-  // last had open in the setup picker.
+  // Not security-relevant: these only remember which model, client tab, and
+  // shell you last had open in the setup picker.
   var CLIENT_KEY = "portal.client";
+  var SHELL_KEY = "portal.shell";
+
+  // defaultShell picks the shell to show before any preference is stored,
+  // guessing from the platform: Windows users get PowerShell, everyone else sh.
+  function defaultShell() {
+    var hay = (navigator.platform || "") + " " + (navigator.userAgent || "");
+    return /win/i.test(hay) ? "powershell" : "sh";
+  }
 
   function readPref(name) {
     try {
@@ -140,9 +148,13 @@
     );
     if (clientTabs.length === 0) return;
 
+    var shellTabs = Array.prototype.slice.call(
+      picker.querySelectorAll("[data-shell-tabs] .guide-tab")
+    );
+
     if (controls) controls.hidden = false;
     picker.setAttribute("data-enhanced", "");
-    [modelTabs, clientTabs].forEach(function (strip) {
+    [modelTabs, clientTabs, shellTabs].forEach(function (strip) {
       strip.forEach(function (tab) {
         tab.setAttribute("role", "tab");
         if (tab.parentElement) tab.parentElement.setAttribute("role", "presentation");
@@ -155,6 +167,7 @@
       model: panels[0].getAttribute("data-model"),
       client: picker.getAttribute("data-default-client") ||
         clientTabs[0].getAttribute("data-client-target"),
+      shell: defaultShell(),
     };
 
     function markStrip(tabs, attr, value) {
@@ -171,8 +184,13 @@
           panel.getAttribute("data-client") === current.client;
         panel.classList.toggle("is-active", on);
       });
+      // The shell preference is a picker-wide attribute; CSS hides the snippet
+      // blocks whose data-shell does not match. Shell-agnostic blocks (config
+      // files, GUI values) carry no data-shell, so they are never hidden.
+      picker.setAttribute("data-shell", current.shell);
       markStrip(modelTabs, "data-model-target", current.model);
       markStrip(clientTabs, "data-client-target", current.client);
+      markStrip(shellTabs, "data-shell-target", current.shell);
     }
 
     function setModel(value, remember) {
@@ -191,6 +209,13 @@
       apply();
     }
 
+    function setShell(value, remember) {
+      if (!shellTabs.some(function (t) { return t.getAttribute("data-shell-target") === value; })) return;
+      current.shell = value;
+      if (remember) writePref(SHELL_KEY, value);
+      apply();
+    }
+
     if (modelTabs.length) {
       picker.querySelector("[data-model-tabs]").addEventListener("click", function (event) {
         var tab = event.target.closest(".guide-tab");
@@ -206,11 +231,22 @@
     picker.querySelector("[data-client-tabs]").addEventListener("keydown",
       arrowNav(clientTabs, function (tab) { setClient(tab.getAttribute("data-client-target"), true); }));
 
+    if (shellTabs.length) {
+      picker.querySelector("[data-shell-tabs]").addEventListener("click", function (event) {
+        var tab = event.target.closest(".guide-tab");
+        if (tab) setShell(tab.getAttribute("data-shell-target"), true);
+      });
+      picker.querySelector("[data-shell-tabs]").addEventListener("keydown",
+        arrowNav(shellTabs, function (tab) { setShell(tab.getAttribute("data-shell-target"), true); }));
+    }
+
     // Restore remembered choices, falling back to the defaults above.
     var rememberedModel = readPref(MODEL_KEY);
     if (rememberedModel) setModel(rememberedModel, false);
     var rememberedClient = readPref(CLIENT_KEY);
     if (rememberedClient) setClient(rememberedClient, false);
+    var rememberedShell = readPref(SHELL_KEY);
+    if (rememberedShell) setShell(rememberedShell, false);
 
     apply();
   });

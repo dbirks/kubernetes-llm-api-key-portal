@@ -87,8 +87,18 @@ type GuideFile struct {
 
 // GuideBlock is a shell snippet.
 type GuideBlock struct {
+	// Language is the human-facing caption shown above the block, e.g. "sh" or
+	// "PowerShell". It is not used for syntax highlighting.
 	Language string
-	Content  string
+
+	// Shell is the toggle key that decides which shell a block belongs to:
+	// "sh", "powershell", or "" for a shell-agnostic block that always shows.
+	// The account page's sh/PowerShell toggle hides blocks whose Shell does not
+	// match the selected shell; empty-Shell blocks (file contents, GUI values)
+	// are never hidden.
+	Shell string
+
+	Content string
 }
 
 // Guide is the full setup story for one client.
@@ -111,6 +121,7 @@ type resolved struct {
 	BaseURL    string // origin + model path, e.g. https://host or https://host/muse
 	APIBase    string // BaseURL + "/v1"
 	Model      string
+	Label      string // human-facing model name, falls back to Model
 	Kind       Kind
 	BrandName  string
 	Key        string
@@ -155,6 +166,7 @@ func (p Params) resolve(m Model) resolved {
 		BaseURL:    base,
 		APIBase:    base + "/v1",
 		Model:      model,
+		Label:      m.resolveLabel(),
 		Kind:       m.Kind,
 		BrandName:  brand,
 		Key:        key,

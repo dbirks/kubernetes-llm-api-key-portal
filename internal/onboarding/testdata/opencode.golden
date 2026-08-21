@@ -23,8 +23,13 @@ Add llm.birks.dev as a custom OpenAI-compatible provider in OpenCode's config.
   }
 }
 
---- commands (bash) ---
+--- commands (sh) ---
 export LLM_BIRKS_DEV_API_KEY="YOUR_API_KEY"
+
+opencode
+
+--- commands (PowerShell) ---
+$env:LLM_BIRKS_DEV_API_KEY = "YOUR_API_KEY"
 
 opencode
 
