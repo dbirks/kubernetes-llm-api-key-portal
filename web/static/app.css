@@ -1359,6 +1359,193 @@ hr {
   to   { background-position: 0 18px; }
 }
 
+/* ---------------------------------------------------- metrics (Grafana) -- */
+
+/*
+ * The prominent link to the Grafana dashboard. It reads as a card so it stands
+ * out from the surrounding prose rather than sitting in it as one more text
+ * link, and it carries its own label and sublabel so its purpose is obvious
+ * before you click. Used on the landing, account, and How it works pages.
+ */
+.metrics-card {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 13px 15px;
+  border: 1px solid var(--border-accent);
+  border-radius: 12px;
+  background: var(--surface-accent);
+  color: var(--text);
+  text-decoration: none;
+}
+.metrics-card:hover {
+  border-color: var(--brand-accent, #3b6fd6);
+  background: var(--surface-accent-2);
+}
+
+.metrics-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: var(--brand-accent-subtle, #1b3057);
+  color: var(--ink-accent-2);
+}
+.metrics-card-icon svg { display: block; }
+
+.metrics-card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.metrics-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-accent);
+  letter-spacing: -0.01em;
+}
+.metrics-card-sub {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--ink-accent-4);
+}
+
+.metrics-card-arrow {
+  margin-left: auto;
+  flex: none;
+  font-size: 15px;
+  color: var(--ink-accent-2);
+}
+.metrics-card:hover .metrics-card-arrow { color: var(--ink-accent); }
+
+/* On the account page the card sits between the keys panel and the endpoints
+   summary, so it needs the same gap the panels keep between themselves. */
+.account-metrics { margin-top: 12px; }
+
+/* On the centred landing panel the card is left-aligned inside, but the block
+   itself is centred and width-limited so it matches the copy above it. */
+.landing .metrics-card {
+  margin: 26px auto 0;
+  max-width: 430px;
+  text-align: left;
+}
+
+/* ----------------------------------------------------------------- about -- */
+
+/* The service description at the top of How it works. Spec chips give the
+   at-a-glance shape; the prose gives the sentence. */
+.about-body {
+  max-width: 660px;
+  margin-bottom: 15px;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--text-muted);
+}
+
+.spec-list {
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.spec {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border: 1px solid var(--border-chip);
+  border-radius: 999px;
+  background: var(--surface);
+  font: 500 11px/1.5 var(--font-mono);
+  color: var(--text-chip);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------ architecture stack -- */
+
+/* The "what it's built on" stack. Layers read top (your request) to bottom
+   (the GPU), each a labelled row, so the whole path is legible at a glance. */
+.stack {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.stack-layer {
+  display: grid;
+  grid-template-columns: 190px 1fr;
+  gap: 6px 16px;
+  align-items: baseline;
+  padding: 11px 15px;
+  border: 1px solid var(--border-node);
+  border-radius: 10px;
+  background: var(--surface);
+}
+/* The foundation reads as the base it is. */
+.stack-layer-base {
+  border-color: var(--border-accent-2);
+  background: var(--surface-accent);
+}
+.stack-layer-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-2);
+  letter-spacing: -0.01em;
+}
+.stack-layer-base .stack-layer-name { color: var(--ink-accent); }
+.stack-layer-desc {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+.stack-layer-desc code {
+  font-size: 11px;
+  color: var(--text-code);
+}
+
+/* A short section header used for the architecture and catalog blocks, in the
+   same key as the lane titles. */
+.hiw-section { margin-top: 22px; }
+.hiw-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.hiw-section-title {
+  font: 600 10px/1.5 var(--font-mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.hiw-section-link {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-accent-2);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.hiw-section-link:hover { text-decoration: underline; }
+.hiw-section-lede {
+  margin-bottom: 13px;
+  max-width: 660px;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--text-muted);
+}
+
+/* The metrics card gets a little air when it closes out the page. */
+.hiw-metrics { margin-top: 22px; }
+
 /* --------------------------------------------------------------- footer -- */
 
 .site-footer {
@@ -1413,6 +1600,9 @@ hr {
   .lane-grid-fast { min-width: 640px; }
 
   .hiw-foot { grid-template-columns: 1fr; }
+
+  /* The layer label sits above its description rather than beside it. */
+  .stack-layer { grid-template-columns: 1fr; gap: 3px; }
 
   .landing { padding: 40px 22px 36px; }
 

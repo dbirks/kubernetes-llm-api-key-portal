@@ -73,13 +73,19 @@
 
 {{/* Endpoints summary: what you can call, where, and where to watch it run.
      Independent of the live /models status page. */}}
-{{if or .Catalog .Models .GrafanaURL}}
+{{if .GrafanaURL}}
+<div class="account-metrics">
+  {{template "metrics_card.html" .}}
+</div>
+{{end}}
+
+{{if or .Catalog .Models}}
 <div class="panel panel-pad endpoints">
   <div class="endpoints-head">
     <h2 class="eyebrow">Endpoints</h2>
     <div class="endpoints-links">
       {{if .Models}}<a class="endpoints-link" href="/models">Live model status →</a>{{end}}
-      {{if .GrafanaURL}}<a class="endpoints-link" href="{{.GrafanaURL}}" target="_blank" rel="noopener">Metrics dashboard →</a>{{end}}
+      <a class="endpoints-link" href="/how-it-works">How it works →</a>
     </div>
   </div>
 

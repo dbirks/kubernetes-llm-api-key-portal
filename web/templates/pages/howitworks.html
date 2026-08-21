@@ -5,6 +5,34 @@
   <h1 class="hiw-title">How it works</h1>
 
   <p class="hiw-lede">
+    {{.Brand.Name}} is a private, self-hosted LLM endpoint. It runs open-weight
+    models on a single GPU in a homelab and exposes them over the same OpenAI-
+    and Anthropic-compatible APIs your tools already speak — so you point a
+    coding agent at it with an API key, and everything else works the way it
+    always has.
+  </p>
+
+  {{/*
+    The service at a glance. Spec chips carry the shape; the sentence carries
+    the nuance a coworker needs before they wire a tool up to it.
+  */}}
+  <ul class="spec-list">
+    <li class="spec">Single GPU · RTX PRO 6000 Blackwell · 96&nbsp;GB</li>
+    <li class="spec">OpenAI &amp; Anthropic compatible</li>
+    <li class="spec">Per-user API keys · Entra sign-in</li>
+    <li class="spec">Open weights · NVFP4 4-bit</li>
+  </ul>
+
+  <p class="about-body">
+    Because it is one GPU rather than a fleet, models load on demand and unload
+    when idle. The first request to a cold model waits a minute or two while it
+    spins up; every request after that is warm until it goes idle again. Send
+    the occasional retry that timing kindness, and it repays you with a fast,
+    private endpoint you don't share with the rest of the internet. Nothing you
+    prompt is stored by this portal.
+  </p>
+
+  <p class="hiw-lede">
     Two things happen here, and only one of them involves this portal. Your
     prompts never pass through it.
   </p>
@@ -102,6 +130,71 @@
     </p>
   </section>
 
+  {{/*
+    Architecture. The stack reads top (your request) to bottom (the GPU) so the
+    whole path a token travels is legible at a glance. Kept as prose-per-layer
+    rather than another animated diagram, because this is the "what it's built
+    on" reference, not the request flow above.
+  */}}
+  <section class="hiw-section">
+    <div class="hiw-section-head">
+      <h2 class="hiw-section-title">What it's built on</h2>
+    </div>
+    <ol class="stack">
+      <li class="stack-layer">
+        <span class="stack-layer-name">Your request</span>
+        <span class="stack-layer-desc">An OpenAI- or Anthropic-shaped HTTPS call carrying your API key as a bearer token.</span>
+      </li>
+      <li class="stack-layer">
+        <span class="stack-layer-name">Cloudflare + kgateway</span>
+        <span class="stack-layer-desc">The public edge. Cloudflare Tunnel brings the request in; kgateway checks the key against its Kubernetes Secret and fails closed if it doesn't match.</span>
+      </li>
+      <li class="stack-layer">
+        <span class="stack-layer-name">Envoy AI Gateway</span>
+        <span class="stack-layer-desc">Routes by the <code>model</code> you named to the engine serving it, and shapes traffic across the co-resident models.</span>
+      </li>
+      <li class="stack-layer">
+        <span class="stack-layer-name">KServe + llm-d</span>
+        <span class="stack-layer-desc">Each model is an <code>LLMInferenceService</code>. It loads on the first request and scales back to zero when idle, which is what the cold start pays for.</span>
+      </li>
+      <li class="stack-layer">
+        <span class="stack-layer-name">vLLM</span>
+        <span class="stack-layer-desc">The inference engine that actually runs each model and streams tokens back to you.</span>
+      </li>
+      <li class="stack-layer">
+        <span class="stack-layer-name">NVFP4 weights</span>
+        <span class="stack-layer-desc">Models are quantised to 4-bit (<code>W4A4</code>) NVFP4, so they compute natively on the card's Blackwell FP4 tensor cores and several fit in one GPU at once.</span>
+      </li>
+      <li class="stack-layer stack-layer-base">
+        <span class="stack-layer-name">RTX PRO 6000 Blackwell</span>
+        <span class="stack-layer-desc">One 96&nbsp;GB GPU, shared across the resident models by HAMi. The whole service is this single card in a homelab — no cloud, no fleet.</span>
+      </li>
+    </ol>
+  </section>
+
+  {{/*
+    The catalog's shape, not a list — the live /models page is the source of
+    truth for which models exist and whether each is warm, so nothing here goes
+    stale as models are added.
+  */}}
+  <section class="hiw-section">
+    <div class="hiw-section-head">
+      <h2 class="hiw-section-title">The model catalog</h2>
+      {{if .Models}}<a class="hiw-section-link" href="/models">See what's live &rarr;</a>{{end}}
+    </div>
+    <p class="hiw-section-lede">
+      The catalog is growing toward roughly half a dozen models — a mix aimed at
+      coding, reasoning, and general-purpose work. Each is addressed by name in
+      the <code>model</code> field and served under its own base path: coding
+      models on <code>/v1</code>, a reasoning model such as Muse-Glimmer on
+      <code>/muse/v1</code>, and so on. One key reaches all of them; the base URL
+      and the model name are what change between them. The
+      {{if .Models}}<a href="/models">models page</a>{{else}}models page{{end}}
+      shows which are published and warm right now, and your account page
+      generates the exact copy-paste setup for each.
+    </p>
+  </section>
+
   <div class="hiw-foot">
     <section class="hiw-card">
       <h2 class="hiw-card-head eyebrow">Endpoints your key opens</h2>
@@ -123,5 +216,13 @@
       </ul>
     </section>
   </div>
+
+  {{/* The dashboard is public read-only; surfacing it here closes the page on
+       "and here's where you can watch it run". */}}
+  {{if .GrafanaURL}}
+  <div class="hiw-metrics">
+    {{template "metrics_card.html" .}}
+  </div>
+  {{end}}
 </div>
 {{end}}

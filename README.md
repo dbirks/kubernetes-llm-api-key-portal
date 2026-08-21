@@ -21,12 +21,16 @@ Those opinions are baked in rather than abstracted away:
   `internal/keystore/kubernetes`, not a setting — it is one half of a contract with the
   `TrafficPolicy` in the cluster repository, and the two must change together. Key *enforcement*
   stays here regardless of what serves the models.
-- **A multi-model catalog is the backend.** Behind the gateway is a KServe/llm-d catalog on one
-  GPU, fronted by an Envoy AI Gateway. Two models are live today — **Qwen3.8-27B** (coding) on the
-  portal origin's `/v1`, and **Muse-Glimmer-30B** (reasoning) under `/muse/v1` — each authenticated
-  by the same key. The setup picker parameterises every client guide per model, so a selection
-  produces the exact base URL and model name for that model. Models can **scale to zero** and load
-  on demand, so a first request to an idle model pays a cold start. The client guides assume the
+- **A multi-model catalog is the backend.** Behind the gateway is a KServe/llm-d catalog on a
+  **single GPU** — an RTX PRO 6000 Blackwell (96 GB) in a homelab — fronted by an Envoy AI Gateway.
+  Models are quantised to **NVFP4 (W4A4)** so they compute natively on the card's Blackwell FP4
+  tensor cores, and the GPU is shared across the resident models by **HAMi**. The catalog is growing
+  toward roughly half a dozen models spanning coding, reasoning, and general-purpose work — e.g.
+  **Qwen3.8-27B** (coding) on the portal origin's `/v1` and **Muse-Glimmer-30B** (reasoning) under
+  `/muse/v1` — each authenticated by the same key and addressed by name. The setup picker
+  parameterises every client guide per model, so a selection produces the exact base URL and model
+  name for that model. Because it is one GPU, models **scale to zero** and load on demand, so a first
+  request to an idle model pays a cold start of a minute or two. The client guides assume the
   Anthropic Messages API, OpenAI-compatible endpoints, and the Responses API are all served from the
   same origin (per model base path).
 - **Kubernetes Secrets are the database.** There is no SQL, no ORM, and no user table.
@@ -59,10 +63,12 @@ internals.
   exact config with the correct base URL for that model.
 - Lists the servable models at `GET /models`, a public page read from the cluster (not from the
   auth-gated `/v1/models`), with a per-model status hint and a cold-start note.
-- Links to a metrics dashboard (`GRAFANA_URL`, e.g. `https://llm.birks.dev/grafana`) from the
-  header and the account page, when one is configured.
-- Explains the moving parts at `GET /how-it-works`, which is public so it can be read before
-  signing in.
+- Surfaces a metrics dashboard (`GRAFANA_URL`, e.g. `https://llm.birks.dev/grafana`) when one is
+  configured: a header link plus a prominent "Live metrics & GPU dashboard" card on the landing,
+  account, and How it works pages.
+- Explains the service at `GET /how-it-works`, which is public so it can be read before signing in:
+  what it is, the key lifecycle, the full **architecture stack** (Cloudflare + kgateway → Envoy AI
+  Gateway → KServe/llm-d → vLLM → NVFP4 weights → the GPU), and the shape of the model catalog.
 
 ### How to use (OpenAI-compatible)
 
@@ -111,10 +117,11 @@ If it is lost, create a replacement and revoke the old one.
                    API-key Secrets
                            | selected by label
                            v
-Internet -> Cloudflare Tunnel -> kgateway -> Envoy AI Gateway -> KServe / llm-d
+Internet -> Cloudflare Tunnel -> kgateway -> Envoy AI Gateway -> KServe / llm-d -> vLLM
                                   (checks the key)  (routes by model name)  (scale-to-zero
-                                                                             on-demand models,
-                                                                             DFlash2 spec-decode)
+                                                                             on-demand models)
+                                                                                     |
+                              NVFP4 (W4A4) weights on one RTX PRO 6000 Blackwell (96 GB), shared by HAMi
 ```
 
 The portal's read of `LLMInferenceServices` is read-only and only powers the `/models` page; it is
