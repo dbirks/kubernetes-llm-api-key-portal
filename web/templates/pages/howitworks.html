@@ -5,224 +5,143 @@
   <h1 class="hiw-title">How it works</h1>
 
   <p class="hiw-lede">
-    {{.Brand.Name}} is a private, self-hosted LLM endpoint. It runs open-weight
-    models on a single GPU in a homelab and exposes them over the same OpenAI-
-    and Anthropic-compatible APIs your tools already speak — so you point a
-    coding agent at it with an API key, and everything else works the way it
-    always has.
+    A private, self-hosted LLM endpoint. It runs open-weight models on a homelab
+    GPU and speaks the same OpenAI- and Anthropic-compatible APIs your tools
+    already use, so you point Claude Code, Cursor, or any client at it with one
+    API key and change nothing else.
   </p>
-
-  {{/*
-    The service at a glance. Spec chips carry the shape; the sentence carries
-    the nuance a coworker needs before they wire a tool up to it.
-  */}}
-  <ul class="spec-list">
-    <li class="spec">Single GPU · RTX PRO 6000 Blackwell · 96&nbsp;GB</li>
-    <li class="spec">OpenAI &amp; Anthropic compatible</li>
-    <li class="spec">Per-user API keys · Entra sign-in</li>
-    <li class="spec">Open weights · NVFP4 4-bit</li>
-  </ul>
-
-  <p class="about-body">
-    Because it is one GPU rather than a fleet, models load on demand and unload
-    when idle. The first request to a cold model waits a minute or two while it
-    spins up; every request after that is warm until it goes idle again. Send
-    the occasional retry that timing kindness, and it repays you with a fast,
-    private endpoint you don't share with the rest of the internet. Nothing you
-    prompt is stored by this portal.
-  </p>
-
-  <p class="hiw-lede">
-    Two things happen here, and only one of them involves this portal. Your
+  <p class="hiw-lede hiw-lede-2">
+    Two things happen here, and only one of them involves this portal — your
     prompts never pass through it.
   </p>
 
   {{/*
-    The connectors are decorative: every node carries its own text, so the
-    diagram reads correctly with animation off, with CSS off, and to a screen
-    reader. The two lanes run at different tempos on purpose — getting a key
-    happens once, using it happens on every request.
+    Lane 1 — getting a key. Every node carries its own text, so the diagram
+    reads correctly with animation off, with CSS off, and to a screen reader;
+    the dashed connectors are decorative. It ambles (~1.9s) because this happens
+    once.
   */}}
-  <section class="lane">
-    <div class="lane-head">
-      <h2 class="lane-title">Getting a key</h2>
-      <span class="lane-badge">once</span>
-    </div>
-    <div class="lane-scroll">
-      <div class="lane-grid lane-grid-slow">
-        <div class="node">
-          <span class="node-name">You, in a browser</span>
-          <span class="node-sub">{{.Brand.ShortName}}</span>
-        </div>
-        <div class="conn">
-          <span class="conn-line" aria-hidden="true"></span>
-          <span class="conn-label">sign in</span>
-        </div>
-        <div class="node">
-          <span class="node-name">Microsoft Entra ID</span>
-          <span class="node-sub">your work account</span>
-        </div>
-        <div class="conn">
-          <span class="conn-line" aria-hidden="true"></span>
-          <span class="conn-label">create key</span>
-        </div>
-        <div class="node node-strong">
-          <span class="node-name">This portal</span>
-          <span class="node-sub">shows the key once</span>
-        </div>
+  <div class="lane-head">
+    <h2 class="lane-title">Getting a key</h2>
+    <span class="lane-badge">once · in your browser</span>
+  </div>
+  <div class="lane-scroll">
+    <div class="flow1">
+      <div class="node">
+        <span class="node-name">You, in a browser</span>
+        <span class="node-sub">{{.Brand.ShortName}}</span>
+      </div>
+      <div class="conn">
+        <span class="conn-line" aria-hidden="true"></span>
+        <span class="conn-label">sign in</span>
+      </div>
+      <div class="node">
+        <span class="node-name">Microsoft Entra ID</span>
+        <span class="node-sub">OIDC · your work account</span>
+      </div>
+      <div class="conn">
+        <span class="conn-line" aria-hidden="true"></span>
+        <span class="conn-label">create key</span>
+      </div>
+      <div class="node node-strong">
+        <span class="node-name">This portal</span>
+        <span class="node-sub">writes the Secret · shows the key once</span>
       </div>
     </div>
-  </section>
-
-  <div class="hinge hinge-down">
-    <span class="hinge-line" aria-hidden="true"></span>
-    <span class="hinge-label">the portal adds your key to one shared Secret</span>
   </div>
 
-  <div class="hinge">
-    <div class="hinge-box">
-      <span class="hinge-box-title">Kubernetes Secret</span>
-      <span class="hinge-box-sub">one aggregate Secret · one entry per key</span>
+  {{/* The hinge: the Secret the portal writes, and what happens to it next. */}}
+  <div class="hinge2">
+    <div class="hinge2-box">
+      <span class="hinge2-title">Kubernetes Secret</span>
+      <span class="hinge2-sub">one per key</span>
     </div>
-  </div>
-
-  <div class="hinge hinge-up">
-    <span class="hinge-label">the gateway matches your key against it</span>
-    <span class="hinge-line hinge-line-fast" aria-hidden="true"></span>
-  </div>
-
-  <section class="lane lane-fast">
-    <div class="lane-head">
-      <h2 class="lane-title">Using the key</h2>
-      <span class="lane-badge">every request</span>
-    </div>
-    <div class="lane-scroll">
-      <div class="lane-grid lane-grid-fast">
-        <div class="node node-accent">
-          <span class="node-name">Your coding agent</span>
-          <span class="node-sub">Bearer &lt;key&gt; · model: …</span>
-        </div>
-        <div class="conn"><span class="conn-line" aria-hidden="true"></span></div>
-        <div class="node node-accent">
-          <span class="node-name node-mono">/v1/*</span>
-          <span class="node-sub">public endpoint</span>
-        </div>
-        <div class="conn"><span class="conn-line" aria-hidden="true"></span></div>
-        <div class="node node-gate">
-          <span class="node-name">Envoy Gateway</span>
-          <span class="node-sub">checks the key</span>
-        </div>
-        <div class="conn"><span class="conn-line" aria-hidden="true"></span></div>
-        <div class="node node-accent">
-          <span class="node-name">Envoy AI Gateway</span>
-          <span class="node-sub">routes by model name</span>
-        </div>
-        <div class="conn"><span class="conn-line" aria-hidden="true"></span></div>
-        <div class="node node-accent">
-          <span class="node-name">KServe / llm-d</span>
-          <span class="node-sub">loads on demand, runs it</span>
-        </div>
-      </div>
-    </div>
-    <p class="hiw-cold">
-      Models scale to zero when idle, so the first request to a cold model waits
-      while it loads; later requests are warm. See <a href="/models">the model list</a>.
+    <p class="hinge2-text">
+      The portal writes a Kubernetes Secret — one per key — and shows the raw
+      value once. From then on it's out of the request path:
+      <strong>Envoy AI Gateway</strong> checks each request's key against that
+      Secret. Revoking deletes it, and anything using the key stops.
     </p>
-  </section>
+  </div>
 
   {{/*
-    Architecture. The stack reads top (your request) to bottom (the GPU) so the
-    whole path a token travels is legible at a glance. Kept as prose-per-layer
-    rather than another animated diagram, because this is the "what it's built
-    on" reference, not the request flow above.
+    Lane 2 — using the key. A vertical stepped path on the left, three
+    explainers on the right. It runs fast (~1.2s) because this happens on every
+    request.
   */}}
-  <section class="hiw-section">
-    <div class="hiw-section-head">
-      <h2 class="hiw-section-title">What it's built on</h2>
-    </div>
-    <ol class="stack">
-      <li class="stack-layer">
-        <span class="stack-layer-name">Your request</span>
-        <span class="stack-layer-desc">An OpenAI- or Anthropic-shaped HTTPS call carrying your API key as a bearer token.</span>
-      </li>
-      <li class="stack-layer">
-        <span class="stack-layer-name">Cloudflare + Envoy Gateway</span>
-        <span class="stack-layer-desc">The public edge. Cloudflare Tunnel brings the request in; Envoy Gateway checks the key against its Kubernetes Secret and fails closed if it doesn't match.</span>
-      </li>
-      <li class="stack-layer">
-        <span class="stack-layer-name">Envoy AI Gateway</span>
-        <span class="stack-layer-desc">Routes by the <code>model</code> you named to the engine serving it, and shapes traffic across the co-resident models.</span>
-      </li>
-      <li class="stack-layer">
-        <span class="stack-layer-name">KServe + llm-d</span>
-        <span class="stack-layer-desc">Each model is an <code>LLMInferenceService</code>. It loads on the first request and scales back to zero when idle, which is what the cold start pays for.</span>
-      </li>
-      <li class="stack-layer">
-        <span class="stack-layer-name">vLLM</span>
-        <span class="stack-layer-desc">The inference engine that actually runs each model and streams tokens back to you.</span>
-      </li>
-      <li class="stack-layer">
-        <span class="stack-layer-name">NVFP4 weights</span>
-        <span class="stack-layer-desc">Models are quantised to 4-bit (<code>W4A4</code>) NVFP4, so they compute natively on the card's Blackwell FP4 tensor cores and several fit in one GPU at once.</span>
-      </li>
-      <li class="stack-layer stack-layer-base">
-        <span class="stack-layer-name">RTX PRO 6000 Blackwell</span>
-        <span class="stack-layer-desc">One 96&nbsp;GB GPU, shared across the resident models by HAMi. The whole service is this single card in a homelab — no cloud, no fleet.</span>
-      </li>
-    </ol>
-  </section>
+  <div class="lane-head">
+    <h2 class="lane-title">Using the key</h2>
+    <span class="lane-badge lane-badge-accent">every request</span>
+  </div>
 
-  {{/*
-    The catalog's shape, not a list — the live /models page is the source of
-    truth for which models exist and whether each is warm, so nothing here goes
-    stale as models are added.
-  */}}
-  <section class="hiw-section">
-    <div class="hiw-section-head">
-      <h2 class="hiw-section-title">The model catalog</h2>
-      {{if .Models}}<a class="hiw-section-link" href="/models">See what's live &rarr;</a>{{end}}
-    </div>
-    <p class="hiw-section-lede">
-      The catalog is growing toward roughly half a dozen models — a mix aimed at
-      coding, reasoning, and general-purpose work. Each is addressed by name in
-      the <code>model</code> field and served under its own base path: coding
-      models on <code>/v1</code>, a reasoning model such as Muse-Glimmer on
-      <code>/muse/v1</code>, and so on. One key reaches all of them; the base URL
-      and the model name are what change between them. The
-      {{if .Models}}<a href="/models">models page</a>{{else}}models page{{end}}
-      shows which are published and warm right now, and your account page
-      generates the exact copy-paste setup for each.
-    </p>
-  </section>
-
-  <div class="hiw-foot">
-    <section class="hiw-card">
-      <h2 class="hiw-card-head eyebrow">Endpoints your key opens</h2>
-      <div class="hiw-card-body">
-        <p class="route"><span class="route-method">GET</span><span class="route-path">/v1/models</span></p>
-        <p class="route"><span class="route-method">POST</span><span class="route-path">/v1/chat/completions</span></p>
-        <p class="route"><span class="route-method">POST</span><span class="route-path">/v1/responses</span></p>
-        <p class="route"><span class="route-method">POST</span><span class="route-path">/v1/messages</span></p>
+  <div class="flow2">
+    <div class="flow2-path">
+      <div class="node node-agent">
+        <span class="node-name">Your coding agent</span>
+        <span class="node-sub">POST · Bearer &lt;key&gt; · model: &lt;name&gt;</span>
       </div>
-    </section>
+      <div class="vconn">
+        <span class="vconn-line" aria-hidden="true"></span>
+        <span class="vconn-label">HTTPS to the model's base URL</span>
+      </div>
+      <div class="node">
+        <span class="node-name">Cloudflare Tunnel</span>
+        <span class="node-sub">public entry · terminates TLS</span>
+      </div>
+      <div class="vconn">
+        <span class="vconn-line" aria-hidden="true"></span>
+        <span class="vconn-label">forwards in-cluster</span>
+      </div>
+      <div class="node node-gate">
+        <span class="node-name">
+          Envoy AI Gateway
+          <span class="node-gate-chip">auth + routing</span>
+        </span>
+        <span class="node-sub">checks your key on /v1*, then routes by model name</span>
+      </div>
+      <div class="vconn">
+        <span class="vconn-line" aria-hidden="true"></span>
+        <span class="vconn-label">key ok → route</span>
+      </div>
+      <div class="node">
+        <span class="node-name">EPP · llm-d scheduler</span>
+        <span class="node-sub">endpoint picker</span>
+      </div>
+      <div class="vconn">
+        <span class="vconn-line" aria-hidden="true"></span>
+      </div>
+      <div class="node">
+        <span class="node-name">vLLM on KServe</span>
+        <span class="node-sub">runs the model · NVFP4 · scales to zero when idle</span>
+      </div>
+    </div>
 
-    <section class="hiw-card hiw-card-pad">
-      <h2 class="eyebrow">Worth knowing</h2>
-      <ul class="hiw-list">
-        <li>Revoking removes your key's entry from the shared Secret, so it stops at the gateway.</li>
-        <li>The same key works for every supported client and every model.</li>
-        <li>Each model has its own base URL — Qwen on <code>/v1</code>, Muse-Glimmer on <code>/muse/v1</code>; set the <code>model</code> field to match. Your account page generates the exact snippet per model.</li>
-        <li>Nothing you prompt is stored by this portal.</li>
-      </ul>
-    </section>
+    <div class="flow2-notes">
+      <div class="explainer explainer-accent">
+        <span class="explainer-title">One gateway, both jobs</span>
+        <p class="explainer-body">
+          <strong>Envoy AI Gateway</strong> does both jobs: it authenticates the
+          request — matching your key against its Secret — and then routes by
+          model name to the right engine.
+        </p>
+      </div>
+      <div class="explainer">
+        <span class="explainer-title">One key, every model</span>
+        <p class="explainer-body">
+          The same key reaches every model. Only the base URL and the
+          <code>model</code> name change between them — the
+          {{if .Models}}<a href="/models">models page</a>{{else}}models page{{end}}
+          is the source of truth for which exist and where.
+        </p>
+      </div>
+      <div class="explainer explainer-warn">
+        <span class="explainer-title">First request may wait</span>
+        <p class="explainer-body">
+          Models scale to zero when idle. The first request to a cold model can
+          take a couple of minutes to load — or need a retry — then it's warm.
+        </p>
+      </div>
+    </div>
   </div>
-
-  {{/* The dashboard is public read-only; surfacing it here closes the page on
-       "and here's where you can watch it run". */}}
-  {{if .GrafanaURL}}
-  <div class="hiw-metrics">
-    {{template "metrics_card.html" .}}
-  </div>
-  {{end}}
 </div>
 {{end}}

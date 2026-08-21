@@ -23,20 +23,11 @@
   <p class="landing-service">{{.Brand.Name}} · {{.Brand.Tagline}}</p>
 
   <p class="landing-copy">
-    A private, self-hosted LLM endpoint. It runs open-weight models on a
-    homelab GPU and speaks the same OpenAI- and Anthropic-compatible APIs your
-    tools already use, so you point Claude Code, Cursor, or any client at it
-    with one API key and nothing else changes. The key reaches every model in
-    the catalog — coding, reasoning, and general-purpose.
+    Create an API key and connect Claude Code, Pi, OpenCode, Codex, or Crush.
   </p>
 
   {{template "ms_button.html" .}}
 
-  {{template "metrics_card.html" .}}
-
-  <p class="landing-note">
-    Models load on demand, so the first request to an idle one warms up before
-    it answers. New here? <a href="/how-it-works">See how it works</a>.
-  </p>
+  <p class="landing-note">Inference runs on self-hosted hardware.</p>
 </div>
 {{end}}

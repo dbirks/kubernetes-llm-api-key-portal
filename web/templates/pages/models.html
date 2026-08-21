@@ -1,13 +1,13 @@
 {{define "title"}}Models{{end}}
 
 {{define "main"}}
-<div class="panel">
+<div class="panel models-panel">
   {{if .Enabled}}
     {{if .Models}}
     <div class="models">
-      <div class="rail-head">
-        <h1 class="eyebrow">Models</h1>
-        <span class="rail-count">{{len .Models}}</span>
+      <div class="models-head">
+        <h1 class="models-title">Models</h1>
+        <span class="models-count">{{len .Models}}</span>
       </div>
 
       <p class="models-lede">
@@ -19,18 +19,15 @@
         {{range .Models}}
         <li class="model-row">
           <div class="model-headings">
-            <span class="model-name">{{.DisplayName}}</span>
-            <code class="model-id">{{.Name}}</code>
+            <code class="model-name">{{.Name}}</code>
+            <span class="model-path">{{.BasePath}}</span>
           </div>
-          <span class="pill {{.StatusClass}}"><span class="pill-dot" aria-hidden="true"></span>{{.StatusLabel}}</span>
+          <span class="status {{.StatusClass}}">
+            <span class="status-dot" aria-hidden="true"></span>{{.StatusLabel}}
+          </span>
         </li>
         {{end}}
       </ul>
-
-      <p class="fine-print">
-        The status is a hint read from the cluster, not from your key — this page
-        never calls the inference endpoint. More models are being added over time.
-      </p>
     </div>
     {{else}}
     <div class="empty-state">

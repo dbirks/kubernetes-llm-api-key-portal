@@ -74,13 +74,18 @@ type ModelView struct {
 	// DisplayName is the human-facing label; it falls back to Name upstream.
 	DisplayName string
 
+	// BasePath is the base URL path this model is served under, e.g. "/v1" or
+	// "/muse/v1". It is a display hint sourced from the onboarding catalog;
+	// models with no configured subpath show the default "/v1".
+	BasePath string
+
 	// Status is the machine value, used only to pick the CSS class.
 	Status models.Status
 
 	// StatusLabel is the human-facing status wording.
 	StatusLabel string
 
-	// StatusClass is the pill modifier class for the status.
+	// StatusClass is the status-pill modifier class for the status.
 	StatusClass string
 }
 
@@ -95,18 +100,25 @@ type ModelsPage struct {
 }
 
 // toModelViews maps catalog entries to their display form, attaching the
-// human-facing status wording and CSS class each pill needs.
-func toModelViews(in []models.Model) []ModelView {
+// human-facing status wording and CSS class each pill needs. basePaths maps a
+// model's routing name to the base URL path it is served under; a name absent
+// from the map falls back to the default "/v1".
+func toModelViews(in []models.Model, basePaths map[string]string) []ModelView {
 	out := make([]ModelView, 0, len(in))
 	for _, m := range in {
 		display := m.DisplayName
 		if display == "" {
 			display = m.Name
 		}
+		path := basePaths[m.Name]
+		if path == "" {
+			path = "/v1"
+		}
 		label, class := statusPresentation(m.Status)
 		out = append(out, ModelView{
 			Name:        m.Name,
 			DisplayName: display,
+			BasePath:    path,
 			Status:      m.Status,
 			StatusLabel: label,
 			StatusClass: class,
@@ -120,13 +132,13 @@ func toModelViews(in []models.Model) []ModelView {
 func statusPresentation(s models.Status) (label, class string) {
 	switch s {
 	case models.StatusReady:
-		return "Ready", "pill-ok"
+		return "Ready", "status-ready"
 	case models.StatusScaledToZero:
-		return "Idle · scaled to zero", "pill-idle"
+		return "Idle · scaled to zero", "status-idle"
 	case models.StatusLoading:
-		return "Loading", "pill-loading"
+		return "Loading", "status-loading"
 	default:
-		return "Unavailable", "pill-unavailable"
+		return "Unavailable", "status-unavailable"
 	}
 }
 

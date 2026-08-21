@@ -82,8 +82,9 @@ func getModels(t *testing.T, app *App) *httptest.ResponseRecorder {
 	return getPath(t, app, "/models")
 }
 
-// The catalog renders each model's routing name, human status, and the
-// cold-start note. It is public, so no session is supplied.
+// The catalog renders each model's routing name, its base URL path, the human
+// status, and the cold-start note. One name per model: the served-name display
+// label is deliberately not shown. It is public, so no session is supplied.
 func TestModelsPageRendersCatalog(t *testing.T) {
 	app := newModelsHarness(t, fakeCatalog{models: []models.Model{
 		{Name: "qwen3.8-nvfp4", DisplayName: "Qwen 3.8", Status: models.StatusReady},
@@ -99,7 +100,7 @@ func TestModelsPageRendersCatalog(t *testing.T) {
 
 	for _, want := range []string{
 		"qwen3.8-nvfp4", "muse-glimmer-30b", "cold-model",
-		"Qwen 3.8", "Muse Glimmer",
+		"/v1",
 		"Ready", "Idle · scaled to zero", "Loading",
 		"cold-start",
 	} {
