@@ -23,16 +23,20 @@
   <p class="landing-service">{{.Brand.Name}} · {{.Brand.Tagline}}</p>
 
   <p class="landing-copy">
-    Create an API key and connect Claude Code, Cursor, any OpenAI-compatible
-    client, or a raw request. One key reaches every model — Qwen3.8-27B for
-    coding and Muse-Glimmer-30B for reasoning.
+    A private, self-hosted LLM endpoint. It runs open-weight models on a
+    homelab GPU and speaks the same OpenAI- and Anthropic-compatible APIs your
+    tools already use, so you point Claude Code, Cursor, or any client at it
+    with one API key and nothing else changes. The key reaches every model in
+    the catalog — coding, reasoning, and general-purpose.
   </p>
 
   {{template "ms_button.html" .}}
 
+  {{template "metrics_card.html" .}}
+
   <p class="landing-note">
-    Inference runs on self-hosted hardware. Models load on demand, so the first
-    request to an idle one warms up before it answers.
+    Models load on demand, so the first request to an idle one warms up before
+    it answers. New here? <a href="/how-it-works">See how it works</a>.
   </p>
 </div>
 {{end}}

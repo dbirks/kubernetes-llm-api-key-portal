@@ -1,0 +1,30 @@
+{{define "metrics_card.html"}}
+{{/*
+  The prominent link to the Grafana dashboard. Rendered only when a metrics URL
+  is configured. It expects the page view model as its dot, so callers invoke it
+  at top-level scope where .GrafanaURL is in range — never from inside a range
+  over keys or models.
+
+  The bar-chart glyph is inline SVG (markup, not a remote asset), so it stays
+  within the style-src/img-src 'self' CSP. It is decorative: the title beside it
+  already names the destination, which is why it is aria-hidden.
+*/}}
+{{if .GrafanaURL}}
+<a class="metrics-card" href="{{.GrafanaURL}}" target="_blank" rel="noopener">
+  <span class="metrics-card-icon" aria-hidden="true">
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 3v18h18"></path>
+      <rect x="7" y="12" width="3" height="5"></rect>
+      <rect x="12" y="8" width="3" height="9"></rect>
+      <rect x="17" y="4" width="3" height="13"></rect>
+    </svg>
+  </span>
+  <span class="metrics-card-text">
+    <span class="metrics-card-title">Live metrics &amp; GPU dashboard</span>
+    <span class="metrics-card-sub">Requests, latency, and GPU utilisation, live in Grafana</span>
+  </span>
+  <span class="metrics-card-arrow" aria-hidden="true">&rarr;</span>
+</a>
+{{end}}
+{{end}}
