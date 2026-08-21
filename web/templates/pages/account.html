@@ -2,7 +2,7 @@
 
 {{define "main"}}
 {{$sel := .SelectedKeyID}}
-<div class="panel">
+<div class="panel{{if not .Keys}} panel-create{{end}}">
   {{if .Keys}}
   <div class="keys">
 
@@ -72,13 +72,8 @@
 </div>
 
 {{/* Endpoints summary: what you can call, where, and where to watch it run.
-     Independent of the live /models status page. */}}
-{{if .GrafanaURL}}
-<div class="account-metrics">
-  {{template "metrics_card.html" .}}
-</div>
-{{end}}
-
+     Independent of the live /models status page. Metrics stay discoverable via
+     the top-nav "Metrics" link only — no dashboard button on this page. */}}
 {{if or .Catalog .Models}}
 <div class="panel panel-pad endpoints">
   <div class="endpoints-head">

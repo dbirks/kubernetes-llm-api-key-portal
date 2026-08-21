@@ -5,12 +5,6 @@
   <h1 class="hiw-title">How it works</h1>
 
   <p class="hiw-lede">
-    A private, self-hosted LLM endpoint. It runs open-weight models on a homelab
-    GPU and speaks the same OpenAI- and Anthropic-compatible APIs your tools
-    already use, so you point Claude Code, Cursor, or any client at it with one
-    API key and change nothing else.
-  </p>
-  <p class="hiw-lede hiw-lede-2">
     Two things happen here, and only one of them involves this portal — your
     prompts never pass through it.
   </p>
@@ -28,8 +22,7 @@
   <div class="lane-scroll">
     <div class="flow1">
       <div class="node">
-        <span class="node-name">You, in a browser</span>
-        <span class="node-sub">{{.Brand.ShortName}}</span>
+        <span class="node-name">Get a key <span class="node-badge">once</span></span>
       </div>
       <div class="conn">
         <span class="conn-line" aria-hidden="true"></span>
@@ -137,8 +130,8 @@
       <div class="explainer explainer-warn">
         <span class="explainer-title">First request may wait</span>
         <p class="explainer-body">
-          Models scale to zero when idle. The first request to a cold model can
-          take a couple of minutes to load — or need a retry — then it's warm.
+          The first request to a cold model will probably take a few minutes to
+          load, or need a retry — then it's warm.
         </p>
       </div>
     </div>

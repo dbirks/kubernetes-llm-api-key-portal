@@ -858,8 +858,13 @@ func TestSignInPageNamesTheOrganisation(t *testing.T) {
 	if !strings.Contains(body, "Sign in with Microsoft") {
 		t.Error("sign-in page is missing the Microsoft button")
 	}
-	if !strings.Contains(body, "llm.birks.dev · Private self-hosted AI endpoint") {
-		t.Error("sign-in page does not show the service name and tagline")
+	// The redundant "name · tagline" sub-line was removed; the lead is the
+	// heading plus the harness copy and the Microsoft button only.
+	if strings.Contains(body, "Private self-hosted AI endpoint") {
+		t.Error("sign-in page still shows the removed service/tagline sub-line")
+	}
+	if !strings.Contains(body, "Create an API key and connect to your harness.") {
+		t.Error("sign-in page is missing the harness copy")
 	}
 }
 

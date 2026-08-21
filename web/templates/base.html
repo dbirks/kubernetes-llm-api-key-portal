@@ -28,11 +28,7 @@
   <div class="topbar-inner">
     <div class="topbar-left">
       <a class="brand" href="/">
-        {{if .Brand.HasLogo}}
-          <img class="brand-logo" src="{{.Brand.LogoURL}}" alt="{{.Brand.LogoAlt}}" height="20">
-        {{else}}
-          <span class="brand-wordmark">{{.Brand.ShortName}}</span>
-        {{end}}
+        <span class="brand-wordmark">{{.Brand.Name}}</span>
       </a>
 
       <nav class="nav" aria-label="Primary">
@@ -72,7 +68,14 @@
         <span class="avatar" aria-hidden="true">{{.User.Initials}}</span>
         {{end}}
         <span class="usermenu-name">{{.User.Name}}</span>
-        <span class="usermenu-caret" aria-hidden="true">▾</span>
+        {{/* Lucide chevron-down, inlined (no external ref) so it stays within
+             the img-src/style-src 'self' CSP. Decorative: the pill already
+             names the user, so it is aria-hidden. */}}
+        <svg class="usermenu-caret" aria-hidden="true" width="16" height="16"
+             viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="m6 9 6 6 6-6"/>
+        </svg>
       </summary>
       <div class="usermenu-panel">
         <p class="usermenu-id">
@@ -84,8 +87,6 @@
         </form>
       </div>
     </details>
-    {{else}}
-    <a class="nav-signin" href="/login">Sign in</a>
     {{end}}
   </div>
 </header>
@@ -95,17 +96,6 @@
 <main id="main" class="site-main">
 {{block "main" .}}{{end}}
 </main>
-
-<footer class="site-footer">
-  <div class="site-footer-inner">
-    <p>{{.Brand.Tagline}}</p>
-    <p class="footer-meta">
-      {{if .Brand.SupportURL}}<a href="{{.Brand.SupportURL}}">Get help</a>
-      {{else if .Brand.SupportEmail}}<a href="mailto:{{.Brand.SupportEmail}}">Get help</a>{{end}}
-      {{if .RequestID}}<span>Request {{.RequestID}}</span>{{end}}
-    </p>
-  </div>
-</footer>
 
 <script src="/static/app.js" defer></script>
 </body>

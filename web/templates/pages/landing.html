@@ -20,14 +20,10 @@
     {{if .Brand.OrgName}}Sign in to your {{.Brand.OrgName}} account{{else}}Sign in{{end}}
   </h1>
 
-  <p class="landing-service">{{.Brand.Name}} · {{.Brand.Tagline}}</p>
-
   <p class="landing-copy">
-    Create an API key and connect Claude Code, Pi, OpenCode, Codex, or Crush.
+    Create an API key and connect to your harness.
   </p>
 
   {{template "ms_button.html" .}}
-
-  <p class="landing-note">Inference runs on self-hosted hardware.</p>
 </div>
 {{end}}

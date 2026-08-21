@@ -11,23 +11,35 @@
       </div>
 
       <p class="models-lede">
-        Set the <code>model</code> field to one of these names. The first request
-        to an idle model cold-starts while it loads on demand.
+        Every model shares one base URL —
+        <code>https://llm.birks.dev/v1</code>. Set the <code>model</code> field
+        to one of these names. The first request to an idle model cold-starts
+        while it loads on demand.
       </p>
 
-      <ul class="model-list" role="list">
-        {{range .Models}}
-        <li class="model-row">
-          <div class="model-headings">
-            <code class="model-name">{{.Name}}</code>
-            <span class="model-path">{{.BasePath}}</span>
-          </div>
-          <span class="status {{.StatusClass}}">
-            <span class="status-dot" aria-hidden="true"></span>{{.StatusLabel}}
-          </span>
-        </li>
-        {{end}}
-      </ul>
+      <table class="models-table">
+        <thead>
+          <tr>
+            <th scope="col">Model</th>
+            <th scope="col">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Models}}
+          <tr>
+            <td class="model-cell">
+              <code class="model-name">{{.Name}}</code>
+              {{if ne .DisplayName .Name}}<span class="model-label">{{.DisplayName}}</span>{{end}}
+            </td>
+            <td class="model-status-cell">
+              <span class="status {{.StatusClass}}">
+                <span class="status-dot" aria-hidden="true"></span>{{.StatusLabel}}
+              </span>
+            </td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
     </div>
     {{else}}
     <div class="empty-state">
