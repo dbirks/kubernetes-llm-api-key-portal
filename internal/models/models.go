@@ -31,8 +31,14 @@ const (
 	// weights, or otherwise in transition.
 	StatusLoading Status = "loading"
 
-	// StatusUnavailable means the object exists but its state could not be
-	// determined. It is the safe answer when the shape is unfamiliar.
+	// StatusUnknown means we could not verify the model's serving state: the
+	// engine Deployment was missing, unreadable, or did not expose a replica
+	// count. It is the safe default — we never assume Ready when we cannot tell.
+	StatusUnknown Status = "unknown"
+
+	// StatusUnavailable means the model itself is absent (no LLMInferenceService
+	// backing it). It is a stronger signal than Unknown: nothing is there to
+	// serve, rather than a state we simply could not read.
 	StatusUnavailable Status = "unavailable"
 )
 

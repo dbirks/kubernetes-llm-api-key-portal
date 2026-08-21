@@ -18,7 +18,8 @@ func newFakeCatalog(t *testing.T, namespace, selector string, objs ...*unstructu
 
 	scheme := runtime.NewScheme()
 	gvrToListKind := map[schema.GroupVersionResource]string{
-		GVR: "LLMInferenceServiceList",
+		GVR:           "LLMInferenceServiceList",
+		deploymentGVR: "DeploymentList",
 	}
 	runtimeObjs := make([]runtime.Object, 0, len(objs))
 	for _, o := range objs {
@@ -70,6 +71,29 @@ func llmisvc(name, modelName, ready string, replicas *int64, labels map[string]s
 	return &unstructured.Unstructured{Object: obj}
 }
 
+// deployment constructs an engine Deployment object. spec is the desired
+// replica count (nil omits spec.replicas entirely); ready is status.readyReplicas
+// (0 omits it, matching how the field is absent until a pod is ready).
+func deployment(name string, spec *int64, ready int64) *unstructured.Unstructured {
+	obj := map[string]any{
+		"apiVersion": deploymentGVR.GroupVersion().String(),
+		"kind":       "Deployment",
+		"metadata": map[string]any{
+			"name":      name,
+			"namespace": "models",
+		},
+		"spec":   map[string]any{},
+		"status": map[string]any{},
+	}
+	if spec != nil {
+		obj["spec"].(map[string]any)["replicas"] = *spec
+	}
+	if ready > 0 {
+		obj["status"].(map[string]any)["readyReplicas"] = ready
+	}
+	return &unstructured.Unstructured{Object: obj}
+}
+
 func int64p(v int64) *int64 { return &v }
 
 func findModel(models []Model, name string) (Model, bool) {
@@ -81,47 +105,61 @@ func findModel(models []Model, name string) (Model, bool) {
 	return Model{}, false
 }
 
+// Status is derived from the engine Deployment (<isvc>-kserve), never from the
+// LLMInferenceService's Ready condition — which stays True even at zero
+// replicas. Each case seeds the LLMISVC with Ready=True on purpose, to prove
+// that condition is ignored and the Deployment's replica counts win.
 func TestListMapsStatus(t *testing.T) {
 	tests := []struct {
 		name     string
-		obj      *unstructured.Unstructured
+		isvc     *unstructured.Unstructured
+		dep      *unstructured.Unstructured
 		wantName string
 		want     Status
 	}{
 		{
-			name:     "ready",
-			obj:      llmisvc("qwen", "qwen3.8-nvfp4", "True", int64p(1), nil),
+			name:     "ready when the engine has a ready replica",
+			isvc:     llmisvc("qwen", "qwen3.8-nvfp4", "True", int64p(0), nil),
+			dep:      deployment("qwen-kserve", int64p(1), 1),
 			wantName: "qwen3.8-nvfp4",
 			want:     StatusReady,
 		},
 		{
-			name:     "scaled to zero wins over ready",
-			obj:      llmisvc("muse", "muse-glimmer-30b", "True", int64p(0), nil),
+			name:     "idle when the engine is scaled to zero, despite Ready=True",
+			isvc:     llmisvc("muse", "muse-glimmer-30b", "True", int64p(1), nil),
+			dep:      deployment("muse-kserve", int64p(0), 0),
 			wantName: "muse-glimmer-30b",
 			want:     StatusScaledToZero,
 		},
 		{
-			name:     "loading when not ready",
-			obj:      llmisvc("cold", "cold-model", "False", int64p(1), nil),
+			name:     "loading when desired exceeds ready",
+			isvc:     llmisvc("cold", "cold-model", "True", nil, nil),
+			dep:      deployment("cold-kserve", int64p(1), 0),
 			wantName: "cold-model",
 			want:     StatusLoading,
 		},
 		{
-			name:     "loading when unknown",
-			obj:      llmisvc("warm", "warm-model", "Unknown", int64p(2), nil),
-			wantName: "warm-model",
-			want:     StatusLoading,
+			name:     "unknown when the engine Deployment is missing",
+			isvc:     llmisvc("gone", "gone-model", "True", int64p(1), nil),
+			dep:      nil,
+			wantName: "gone-model",
+			want:     StatusUnknown,
 		},
 		{
-			name:     "unavailable when no signal",
-			obj:      llmisvc("mystery", "mystery-model", "", nil, nil),
+			name:     "unknown when the Deployment omits spec.replicas",
+			isvc:     llmisvc("mystery", "mystery-model", "True", int64p(1), nil),
+			dep:      deployment("mystery-kserve", nil, 0),
 			wantName: "mystery-model",
-			want:     StatusUnavailable,
+			want:     StatusUnknown,
 		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			store := newFakeCatalog(t, "models", "", tc.obj)
+			objs := []*unstructured.Unstructured{tc.isvc}
+			if tc.dep != nil {
+				objs = append(objs, tc.dep)
+			}
+			store := newFakeCatalog(t, "models", "", objs...)
 			got, err := store.List(context.Background())
 			if err != nil {
 				t.Fatalf("List: %v", err)

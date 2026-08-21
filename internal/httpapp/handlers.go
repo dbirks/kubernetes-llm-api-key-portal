@@ -137,29 +137,22 @@ func (a *App) handleModels(w http.ResponseWriter, r *http.Request) {
 
 	a.mustRender(w, r, http.StatusOK, "models.html", ModelsPage{
 		Page:    page,
-		Models:  toModelViews(list, a.modelBasePaths()),
+		Models:  toModelViews(list, a.modelLabels()),
 		Enabled: true,
 	})
 }
 
-// modelBasePaths maps each onboarding-configured model's routing name to the
-// base URL path it is served under, e.g. "qwen3.8-nvfp4" -> "/v1" and
-// "muse-glimmer-30b" -> "/muse/v1". It reuses the same onboarding catalog that
-// drives the account page's setup snippets, so the two pages agree on where a
-// model lives. Live models with no configured subpath fall back to "/v1" in
-// toModelViews.
-func (a *App) modelBasePaths() map[string]string {
-	origin := strings.TrimSuffix(strings.TrimSpace(a.onboarding.BaseURL), "/")
+// modelLabels maps each onboarding-configured model's routing name to its
+// friendly label, e.g. "qwen3.8-nvfp4" -> "Qwen3.8-27B". It reuses the same
+// onboarding catalog that drives the account page's setup picker, so the two
+// pages show the same human-facing names. A routing name absent from the map
+// falls back to the cluster-derived display name in toModelViews.
+func (a *App) modelLabels() map[string]string {
 	out := make(map[string]string)
 	for _, m := range onboarding.Catalog(a.onboarding) {
-		path := m.APIBase
-		if origin != "" {
-			path = strings.TrimPrefix(path, origin)
+		if m.Label != "" {
+			out[m.ID] = m.Label
 		}
-		if path == "" {
-			path = "/v1"
-		}
-		out[m.ID] = path
 	}
 	return out
 }

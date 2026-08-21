@@ -27,6 +27,13 @@ const (
 	catalogResource = "llminferenceservices"
 )
 
+// engineSuffix is appended to an LLMInferenceService's name to find the engine
+// Deployment KServe creates for it, e.g. "qwen38-llm" -> "qwen38-llm-kserve".
+// That Deployment — not the LLMISVC's Ready condition — is the source of truth
+// for serving state, because the Ready condition stays True even at zero
+// replicas under scale-to-zero.
+const engineSuffix = "-kserve"
+
 // listTimeout bounds the catalog read so a slow API server cannot hang the page.
 const listTimeout = 5 * time.Second
 
@@ -35,6 +42,13 @@ var GVR = schema.GroupVersionResource{
 	Group:    catalogGroup,
 	Version:  catalogVersion,
 	Resource: catalogResource,
+}
+
+// deploymentGVR is the engine Deployment resource the status derivation reads.
+var deploymentGVR = schema.GroupVersionResource{
+	Group:    "apps",
+	Version:  "v1",
+	Resource: "deployments",
 }
 
 // Options configures the Kubernetes catalog.
@@ -85,12 +99,33 @@ func (s *Store) List(ctx context.Context) ([]Model, error) {
 		return nil, fmt.Errorf("list %s: %w", catalogResource, err)
 	}
 
+	// Read the engine Deployments once and index them by name. A failure here is
+	// not fatal: every model then derives StatusUnknown, which is the honest
+	// answer when we cannot verify serving state — never a false "Ready".
+	deploys := s.engineDeployments(ctx)
+
 	out := make([]Model, 0, len(list.Items))
 	for i := range list.Items {
-		out = append(out, toModel(&list.Items[i]))
+		out = append(out, toModel(&list.Items[i], deploys))
 	}
 	sortByDisplayName(out)
 	return out, nil
+}
+
+// engineDeployments lists the Deployments in the catalog namespace and indexes
+// them by name. It returns nil on any error; callers treat a missing entry and
+// a nil map identically, so a read failure degrades every model to Unknown
+// rather than failing the page.
+func (s *Store) engineDeployments(ctx context.Context) map[string]*unstructured.Unstructured {
+	list, err := s.client.Resource(deploymentGVR).Namespace(s.namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil
+	}
+	byName := make(map[string]*unstructured.Unstructured, len(list.Items))
+	for i := range list.Items {
+		byName[list.Items[i].GetName()] = &list.Items[i]
+	}
+	return byName
 }
 
 // toModel maps one object to a catalog entry.
@@ -98,7 +133,7 @@ func (s *Store) List(ctx context.Context) ([]Model, error) {
 // The routing name is spec.model.name, which is what a client sends in the
 // OpenAI "model" field. It falls back to the object's own name, which is what
 // KServe defaults the served name to when the field is omitted.
-func toModel(obj *unstructured.Unstructured) Model {
+func toModel(obj *unstructured.Unstructured, deploys map[string]*unstructured.Unstructured) Model {
 	name, ok, _ := unstructured.NestedString(obj.Object, "spec", "model", "name")
 	if !ok || name == "" {
 		name = obj.GetName()
@@ -110,72 +145,39 @@ func toModel(obj *unstructured.Unstructured) Model {
 	return Model{
 		Name:        name,
 		DisplayName: display,
-		Status:      deriveStatus(obj),
+		Status:      deriveStatus(deploys[obj.GetName()+engineSuffix]),
 	}
 }
 
-// deriveStatus reads a coarse serving state off the object.
+// deriveStatus reads a coarse serving state off the engine Deployment.
 //
-// This is the one place that knows the object's status shape, kept isolated on
-// purpose. The scaled-to-zero-vs-loading distinction is KServe-version-specific
-// and the field it reads may move between releases; when it cannot be told
-// apart, the safe two-state answer (ready vs not-ready) is what falls out. Only
-// the presentation of that hint depends on getting the nuance exactly right, so
-// a wrong guess here is a cosmetic label, never a routing or auth decision.
-func deriveStatus(obj *unstructured.Unstructured) Status {
-	// An explicit desired-zero is the clearest signal of a deliberately idle
-	// model, so it wins over the Ready condition: a scaled-to-zero model can
-	// still report Ready=True on the last-known revision.
-	if desired, ok := desiredReplicas(obj); ok && desired == 0 {
+// The LLMInferenceService's own Ready condition is deliberately NOT consulted:
+// it stays True even at zero replicas under scale-to-zero, so every idle model
+// would misreport as Ready. The Deployment's replica counts are the truth.
+//
+//   - no Deployment, or no spec.replicas to read -> Unknown (we cannot verify;
+//     never assume Ready)
+//   - spec.replicas == 0                         -> Idle · scaled to zero
+//   - spec.replicas > 0 and readyReplicas < it   -> Loading
+//   - otherwise (readyReplicas >= spec.replicas) -> Ready
+func deriveStatus(dep *unstructured.Unstructured) Status {
+	if dep == nil {
+		return StatusUnknown
+	}
+	desired, ok, err := unstructured.NestedInt64(dep.Object, "spec", "replicas")
+	if !ok || err != nil {
+		return StatusUnknown
+	}
+	if desired == 0 {
 		return StatusScaledToZero
 	}
-
-	switch readyCondition(obj) {
-	case "True":
-		return StatusReady
-	case "False", "Unknown":
+	// readyReplicas is omitted from status until at least one pod is ready, so a
+	// missing value reads as zero — which is correct: nothing is ready yet.
+	ready, _, _ := unstructured.NestedInt64(dep.Object, "status", "readyReplicas")
+	if ready < desired {
 		return StatusLoading
-	default:
-		// No Ready condition and no replica hint: we genuinely cannot tell.
-		return StatusUnavailable
 	}
-}
-
-// readyCondition returns the status of the Ready condition ("True", "False",
-// "Unknown"), or "" when there is no such condition.
-func readyCondition(obj *unstructured.Unstructured) string {
-	conds, ok, _ := unstructured.NestedSlice(obj.Object, "status", "conditions")
-	if !ok {
-		return ""
-	}
-	for _, c := range conds {
-		cond, ok := c.(map[string]any)
-		if !ok {
-			continue
-		}
-		if t, _ := cond["type"].(string); t == "Ready" {
-			s, _ := cond["status"].(string)
-			return s
-		}
-	}
-	return ""
-}
-
-// desiredReplicas returns the desired replica count and whether one was found.
-//
-// The field's home is version-specific, so a few known locations are tried in
-// order. A missing value is reported as not-found rather than as zero, so an
-// object that simply does not expose it is not mistaken for scaled-to-zero.
-func desiredReplicas(obj *unstructured.Unstructured) (int64, bool) {
-	for _, path := range [][]string{
-		{"spec", "replicas"},
-		{"status", "replicas"},
-	} {
-		if v, ok, err := unstructured.NestedInt64(obj.Object, path...); ok && err == nil {
-			return v, true
-		}
-	}
-	return 0, false
+	return StatusReady
 }
 
 func sortByDisplayName(m []Model) {

@@ -74,11 +74,6 @@ type ModelView struct {
 	// DisplayName is the human-facing label; it falls back to Name upstream.
 	DisplayName string
 
-	// BasePath is the base URL path this model is served under, e.g. "/v1" or
-	// "/muse/v1". It is a display hint sourced from the onboarding catalog;
-	// models with no configured subpath show the default "/v1".
-	BasePath string
-
 	// Status is the machine value, used only to pick the CSS class.
 	Status models.Status
 
@@ -100,25 +95,27 @@ type ModelsPage struct {
 }
 
 // toModelViews maps catalog entries to their display form, attaching the
-// human-facing status wording and CSS class each pill needs. basePaths maps a
-// model's routing name to the base URL path it is served under; a name absent
-// from the map falls back to the default "/v1".
-func toModelViews(in []models.Model, basePaths map[string]string) []ModelView {
+// human-facing status wording and CSS class each pill needs. Every model is
+// served under the one base URL now, so there is no per-model path to carry.
+//
+// labels maps a routing name to a friendly label (from the onboarding catalog,
+// which the account page's picker also uses, so the two pages agree). It wins
+// over the cluster-derived DisplayName when present; otherwise the display
+// falls back to DisplayName and finally the routing name.
+func toModelViews(in []models.Model, labels map[string]string) []ModelView {
 	out := make([]ModelView, 0, len(in))
 	for _, m := range in {
 		display := m.DisplayName
 		if display == "" {
 			display = m.Name
 		}
-		path := basePaths[m.Name]
-		if path == "" {
-			path = "/v1"
+		if friendly := labels[m.Name]; friendly != "" {
+			display = friendly
 		}
 		label, class := statusPresentation(m.Status)
 		out = append(out, ModelView{
 			Name:        m.Name,
 			DisplayName: display,
-			BasePath:    path,
 			Status:      m.Status,
 			StatusLabel: label,
 			StatusClass: class,
@@ -137,8 +134,12 @@ func statusPresentation(s models.Status) (label, class string) {
 		return "Idle · scaled to zero", "status-idle"
 	case models.StatusLoading:
 		return "Loading", "status-loading"
-	default:
+	case models.StatusUnavailable:
 		return "Unavailable", "status-unavailable"
+	default:
+		// StatusUnknown and any future value: the honest "we couldn't verify"
+		// badge, never an implied Ready.
+		return "Unknown", "status-unknown"
 	}
 }
 
