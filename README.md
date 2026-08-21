@@ -15,12 +15,12 @@ Those opinions are baked in rather than abstracted away:
   second identity provider, and no plan for one.
 - **One Entra tenant.** Anyone in the configured tenant may sign in. The code keeps tenant ID
   explicit throughout so a future multi-tenant allowlist stays possible, but v1 accepts exactly one.
-- **kgateway enforces the keys.** The Secret shape, the `extauth.solo.io/apikey` type, and the
-  `llm-portal/*` label prefix exist because that is what kgateway's built-in API-key auth
-  selects on. `llm-portal` is a compile-time constant in
-  `internal/keystore/kubernetes`, not a setting — it is one half of a contract with the
-  `TrafficPolicy` in the cluster repository, and the two must change together. Key *enforcement*
-  stays here regardless of what serves the models.
+- **Envoy Gateway enforces the keys.** Its `SecurityPolicy.apiKeyAuth` reads every valid
+  credential from **one aggregate Opaque Secret** referenced by name — there is no label selector
+  and no per-key Secret. So the portal keeps all issued keys as entries in that single Secret
+  (`llm-apikeys` in `llm-portal`), each entry `client-<id>: llm_<credential>`. The Secret's name
+  and namespace are configurable (`KUBERNETES_SECRET_NAME`, `KUBERNETES_NAMESPACE`). Key
+  *enforcement* stays with the gateway regardless of what serves the models.
 - **A multi-model catalog is the backend.** Behind the gateway is a KServe/llm-d catalog on a
   **single GPU** — an RTX PRO 6000 Blackwell (96 GB) in a homelab — fronted by an Envoy AI Gateway.
   Models are quantised to **NVFP4 (W4A4)** so they compute natively on the card's Blackwell FP4
@@ -42,8 +42,8 @@ contract. Treat it as a starting point, not a product.
 ```
 Microsoft Entra ID   ->  who is this person?
 This portal          ->  may they create and revoke their own credentials?
-Kubernetes Secrets   ->  where are the credentials stored?
-kgateway             ->  is this API request carrying a valid credential?
+Kubernetes Secret    ->  where are the credentials stored? (one aggregate Secret)
+Envoy Gateway        ->  is this API request carrying a valid credential?
 Envoy AI Gateway     ->  which model does "model": "…" route to?
 KServe / llm-d       ->  load the model on demand and run the request.
 ```
@@ -67,8 +67,8 @@ internals.
   configured: a header link plus a prominent "Live metrics & GPU dashboard" card on the landing,
   account, and How it works pages.
 - Explains the service at `GET /how-it-works`, which is public so it can be read before signing in:
-  what it is, the key lifecycle, the full **architecture stack** (Cloudflare + kgateway → Envoy AI
-  Gateway → KServe/llm-d → vLLM → NVFP4 weights → the GPU), and the shape of the model catalog.
+  what it is, the key lifecycle, the full **architecture stack** (Cloudflare + Envoy Gateway → Envoy
+  AI Gateway → KServe/llm-d → vLLM → NVFP4 weights → the GPU), and the shape of the model catalog.
 
 ### How to use (OpenAI-compatible)
 
@@ -111,13 +111,14 @@ If it is lost, create a replacement and revoke the old one.
                  |   this portal      |
                  +---------+----------+
                            | Kubernetes API
-                           |   - writes API-key Secrets (create/delete)
+                           |   - upserts entries in the aggregate API-key Secret (patch/create)
                            |   - reads LLMInferenceServices (list, for /models)
                            v
-                   API-key Secrets
-                           | selected by label
+                 aggregate API-key Secret
+                     (llm-apikeys)
+                           | referenced by name
                            v
-Internet -> Cloudflare Tunnel -> kgateway -> Envoy AI Gateway -> KServe / llm-d -> vLLM
+Internet -> Cloudflare Tunnel -> Envoy Gateway -> Envoy AI Gateway -> KServe / llm-d -> vLLM
                                   (checks the key)  (routes by model name)  (scale-to-zero
                                                                              on-demand models)
                                                                                      |
@@ -125,9 +126,9 @@ Internet -> Cloudflare Tunnel -> kgateway -> Envoy AI Gateway -> KServe / llm-d 
 ```
 
 The portal's read of `LLMInferenceServices` is read-only and only powers the `/models` page; it is
-independent of key enforcement, which remains kgateway's job.
+independent of key enforcement, which remains the gateway's job.
 
-Deployment manifests — Gateway, HTTPRoute, TrafficPolicy, RBAC, Cloudflare Tunnel, Envoy AI Gateway,
+Deployment manifests — Gateway, HTTPRoute, SecurityPolicy, RBAC, Cloudflare Tunnel, Envoy AI Gateway,
 and the KServe/llm-d model set — live in the cluster repository (`dbirks/home-k8s`), not here. This
 repository produces one container image and documents the contract that image expects.
 
@@ -374,44 +375,43 @@ The portal never talks to etcd.
 
 ## Kubernetes Secret contract
 
-One Secret per credential:
+All issued keys are entries in **one aggregate Opaque Secret**. Envoy Gateway's
+`SecurityPolicy.apiKeyAuth` references that Secret by name and compares a presented credential
+against its values — there is no label selector, so there is no per-key Secret:
 
 ```yaml
 apiVersion: v1
 kind: Secret
 metadata:
-  name: llm-key-<opaque-id>
-  namespace: llm-access
-  labels:
-    llm-portal/api-key: "true"          # the gateway's selector
-    llm-portal/owner-tid: "<entra-tenant-id>"
-    llm-portal/owner-oid: "<entra-object-id>"
+  name: llm-apikeys            # KUBERNETES_SECRET_NAME (default)
+  namespace: llm-portal        # KUBERNETES_NAMESPACE
   annotations:
-    llm-portal/display-name: "MacBook Claude Code"
-    llm-portal/key-suffix: "A1b2C3"
-    llm-portal/owner-display-name: "Alice Example"
-    llm-portal/owner-email: "alice@example.com"
-    llm-portal/managed-by: "ai-account"
-type: extauth.solo.io/apikey
-immutable: true
-stringData:
-  client-<opaque-id>: "llm_<credential>"
+    # one per issued key: ownership tuple + display metadata, as JSON.
+    # the gateway never reads these; the account page uses them to list and
+    # revoke a user's own keys, since a per-key label is no longer possible.
+    llm-portal/key-<id>: '{"tid":"<entra-tenant-id>","oid":"<entra-object-id>","name":"MacBook Claude Code","suffix":"A1b2C3","owner_name":"Alice Example","owner_email":"alice@example.com","created":"2026-08-21T00:00:00Z"}'
+type: Opaque
+data:
+  client-<id>: <base64 of "llm_<credential>">   # bare token, no "Bearer " prefix
+  client-test: <base64 of "llm_testkey123">     # bootstrap entry, owned by nobody
 ```
 
-The `llm-portal` prefix is the `LabelDomain` constant in `internal/keystore/kubernetes`. It must
-match the gateway's `secretSelector`. Changing it is a code change on purpose: as an environment
-variable it looked like a per-deployment preference, and a mismatch silently stops every key from
-authenticating with no error anywhere.
+The Secret is created once (SOPS-managed in the cluster repository) and the portal **upserts
+entries into it at runtime** — it never recreates it. Issuing a key `patch`es in one
+`client-<id>` data entry plus its ownership annotation; revoking `patch`es both back out (a JSON
+merge patch with `null` values). If the Secret is somehow absent, the first issue creates it.
 
-It is deliberately not a hostname. A label prefix outlives whatever DNS name the portal is served
-from, so embedding the current one would mean either a stale label or migrating every Secret the
-next time the site moves.
+Ownership lives in the per-key `llm-portal/key-<id>` annotation because there is only one object to
+hang a label on. Every list/get/revoke checks the caller's Entra tuple against the annotation; a
+data entry with no matching annotation — the bootstrap `client-test` entry, for one — is owned by
+nobody and never appears on any user's account page.
 
-Secrets are immutable: keys are created and deleted, never edited. Rotation is create replacement →
-verify → revoke old.
+The `llm-portal` prefix is the `LabelDomain` constant in `internal/keystore/kubernetes`. These
+annotations are internal to the portal (the gateway ignores them), so the value only has to stay
+stable across the portal's own upgrades. It is deliberately not a hostname.
 
-Neither the Secret name nor the client identifier contains the user's email or object ID. The
-client identifier may appear in gateway logs, so it is kept opaque and non-identifying.
+Neither the data key (client identifier) nor the credential contains the user's email or object
+ID. The client identifier may appear in gateway logs, so it is kept opaque and non-identifying.
 
 ### Required RBAC
 
@@ -421,11 +421,12 @@ The portal's ServiceAccount needs, in that namespace only:
 rules:
   - apiGroups: [""]
     resources: ["secrets"]
-    verbs: ["get", "list", "create", "delete"]
+    verbs: ["get", "list", "watch", "create", "patch", "update"]
 ```
 
-There is deliberately no `update` or `patch`: the service has no code path that modifies an
-existing credential Secret, and withholding the verb makes that structural.
+`patch` (and `create`, to bootstrap a missing Secret) is what lets the portal upsert entries into
+the single aggregate Secret. It can be narrowed to `resourceNames: ["llm-apikeys"]` for the
+mutating verbs.
 
 The dedicated namespace matters. Kubernetes RBAC cannot restrict Secret access by label, only by
 namespace and name, so the namespace is the actual blast-radius boundary.
@@ -446,10 +447,10 @@ the model objects, not here.
 
 ## Security notes
 
-**Credentials are stored in cleartext in Kubernetes Secrets.** This is a deliberate trade-off, not
-an oversight. kgateway's built-in API-key authentication compares the presented credential against
-the value in the Secret, so a hash cannot be substituted without giving up built-in auth and
-writing a custom auth service.
+**Credentials are stored in cleartext in a Kubernetes Secret.** This is a deliberate trade-off, not
+an oversight. Envoy Gateway's built-in API-key authentication compares the presented credential
+against the value in the Secret, so a hash cannot be substituted without giving up built-in auth
+and writing a custom auth service.
 
 The compensating controls are the cluster's responsibility:
 
@@ -534,8 +535,8 @@ CI fails if the goldens are stale.
 ### Testing against a real cluster
 
 The Kubernetes store is unit-tested with `client-go`'s fake clientset, which checks the object we
-build and our own ownership logic. It cannot tell you whether the API server accepts that object,
-whether your RBAC is right, or whether `immutable: true` is genuinely enforced — the fake simulates
+build and our own ownership logic. It cannot tell you whether the API server accepts our merge
+patch, or whether your RBAC grants the `patch`/`create` verbs the upsert needs — the fake simulates
 none of that.
 
 For those, there is an opt-in integration test:
@@ -550,7 +551,7 @@ It creates real Secrets through your current kubeconfig context and deletes them
 Point it at a scratch namespace. Without the environment variable it skips, so `go test ./...` and
 CI are unaffected.
 
-What still is not covered anywhere in this repository: whether kgateway actually accepts the
+What still is not covered anywhere in this repository: whether the gateway actually accepts the
 credential. That needs the checklist at the end of this file.
 
 ### Layout
@@ -571,10 +572,12 @@ web/                 templates and static assets, embedded via go:embed
 
 ## Verifying the gateway integration
 
-The credential shape depends on kgateway's contract, which cannot be verified from this repository.
-Before pointing colleagues at the portal, confirm against the kgateway release actually deployed:
+The credential shape depends on the gateway's contract, which cannot be verified from this
+repository. Before pointing colleagues at the portal, confirm against the Envoy Gateway release
+actually deployed:
 
-- [ ] The `TrafficPolicy` `secretSelector` matches `llm-portal/api-key=true`.
+- [ ] The `SecurityPolicy.apiKeyAuth` `credentialRefs` names the `llm-apikeys` Secret, and each
+      `data` value there is accepted as a valid key.
 - [ ] `Authorization: Bearer <key>` is accepted (OpenAI-compatible SDKs, Claude Code gateway mode).
 - [ ] `X-Api-Key: <key>` is accepted where Anthropic-style clients need it.
 - [ ] A revoked key stops authenticating after the normal watch propagation delay.

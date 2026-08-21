@@ -49,6 +49,7 @@ type Config struct {
 
 	KeystoreMode           KeystoreMode
 	KubernetesNamespace    string
+	KubernetesSecretName   string
 	KubernetesAllowKubecfg bool
 	KubernetesKubeconfig   string
 
@@ -126,13 +127,14 @@ type BrandConfig struct {
 
 // Defaults applied when a variable is unset.
 const (
-	defaultPort         = 8080
-	defaultLogLevel     = "info"
-	defaultAPIKeyPrefix = "llm_"
-	defaultBrandName    = "llm.birks.dev"
-	defaultBrandOrgName = "E-gineering"
-	defaultBrandTagline = "Private self-hosted AI endpoint"
-	defaultBrandAccent  = "#3b6fd6"
+	defaultPort                 = 8080
+	defaultLogLevel             = "info"
+	defaultAPIKeyPrefix         = "llm_"
+	defaultKubernetesSecretName = "llm-apikeys"
+	defaultBrandName            = "llm.birks.dev"
+	defaultBrandOrgName         = "E-gineering"
+	defaultBrandTagline         = "Private self-hosted AI endpoint"
+	defaultBrandAccent          = "#3b6fd6"
 
 	minSessionKeyBytes = 32
 )
@@ -158,6 +160,7 @@ func Load() (*Config, error) {
 		EntraAvatars:      boolEnvDefault("ENTRA_AVATARS", true),
 
 		KubernetesNamespace:    strings.TrimSpace(os.Getenv("KUBERNETES_NAMESPACE")),
+		KubernetesSecretName:   lookupDefault("KUBERNETES_SECRET_NAME", defaultKubernetesSecretName),
 		KubernetesKubeconfig:   strings.TrimSpace(os.Getenv("KUBECONFIG")),
 		KubernetesAllowKubecfg: boolEnv("KUBERNETES_ALLOW_KUBECONFIG"),
 

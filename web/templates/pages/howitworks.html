@@ -76,18 +76,18 @@
 
   <div class="hinge hinge-down">
     <span class="hinge-line" aria-hidden="true"></span>
-    <span class="hinge-label">the portal writes one immutable Secret</span>
+    <span class="hinge-label">the portal adds your key to one shared Secret</span>
   </div>
 
   <div class="hinge">
     <div class="hinge-box">
       <span class="hinge-box-title">Kubernetes Secret</span>
-      <span class="hinge-box-sub">one per key · immutable</span>
+      <span class="hinge-box-sub">one aggregate Secret · one entry per key</span>
     </div>
   </div>
 
   <div class="hinge hinge-up">
-    <span class="hinge-label">kgateway matches your key against it</span>
+    <span class="hinge-label">the gateway matches your key against it</span>
     <span class="hinge-line hinge-line-fast" aria-hidden="true"></span>
   </div>
 
@@ -109,7 +109,7 @@
         </div>
         <div class="conn"><span class="conn-line" aria-hidden="true"></span></div>
         <div class="node node-gate">
-          <span class="node-name">kgateway</span>
+          <span class="node-name">Envoy Gateway</span>
           <span class="node-sub">checks the key</span>
         </div>
         <div class="conn"><span class="conn-line" aria-hidden="true"></span></div>
@@ -146,8 +146,8 @@
         <span class="stack-layer-desc">An OpenAI- or Anthropic-shaped HTTPS call carrying your API key as a bearer token.</span>
       </li>
       <li class="stack-layer">
-        <span class="stack-layer-name">Cloudflare + kgateway</span>
-        <span class="stack-layer-desc">The public edge. Cloudflare Tunnel brings the request in; kgateway checks the key against its Kubernetes Secret and fails closed if it doesn't match.</span>
+        <span class="stack-layer-name">Cloudflare + Envoy Gateway</span>
+        <span class="stack-layer-desc">The public edge. Cloudflare Tunnel brings the request in; Envoy Gateway checks the key against its Kubernetes Secret and fails closed if it doesn't match.</span>
       </li>
       <li class="stack-layer">
         <span class="stack-layer-name">Envoy AI Gateway</span>
@@ -209,7 +209,7 @@
     <section class="hiw-card hiw-card-pad">
       <h2 class="eyebrow">Worth knowing</h2>
       <ul class="hiw-list">
-        <li>Revoking deletes the Secret, so the key stops at kgateway.</li>
+        <li>Revoking removes your key's entry from the shared Secret, so it stops at the gateway.</li>
         <li>The same key works for every supported client and every model.</li>
         <li>Each model has its own base URL — Qwen on <code>/v1</code>, Muse-Glimmer on <code>/muse/v1</code>; set the <code>model</code> field to match. Your account page generates the exact snippet per model.</li>
         <li>Nothing you prompt is stored by this portal.</li>

@@ -43,7 +43,11 @@ func integrationStore(t *testing.T) (*Store, string) {
 	if err != nil {
 		t.Fatalf("connecting to the cluster: %v", err)
 	}
-	store, err := New(Options{Client: client, Namespace: namespace, KeyPrefix: "llm_"})
+	secretName := strings.TrimSpace(os.Getenv("PORTAL_INTEGRATION_SECRET"))
+	if secretName == "" {
+		secretName = "llm-apikeys-itest"
+	}
+	store, err := New(Options{Client: client, Namespace: namespace, SecretName: secretName, KeyPrefix: "llm_"})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -70,7 +74,7 @@ func TestIntegrationKeyLifecycle(t *testing.T) {
 		_ = store.RevokeKey(context.Background(), alice.ID(), created.ID)
 	})
 
-	t.Logf("created %s/%s%s", namespace, secretNamePrefix, created.ID)
+	t.Logf("created entry client-%s in %s/%s", created.ID, namespace, store.secretName)
 
 	keys, err := store.ListKeys(ctx, alice.ID())
 	if err != nil {
@@ -110,14 +114,15 @@ func TestIntegrationKeyLifecycle(t *testing.T) {
 	}
 }
 
-// Immutability is enforced by the API server, not by us. This confirms the flag
-// actually takes effect, which the fake clientset does not simulate.
-func TestIntegrationSecretIsImmutable(t *testing.T) {
+// A real API server must accept the merge patch that upserts an entry into the
+// aggregate Secret. The fake clientset cannot confirm the ServiceAccount has the
+// patch verb, which is exactly the RBAC that the single-Secret model requires.
+func TestIntegrationUpsertPatchIsAccepted(t *testing.T) {
 	store, namespace := integrationStore(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	created, err := store.CreateKey(ctx, alice, "immutability check")
+	created, err := store.CreateKey(ctx, alice, "patch check")
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)
 	}
@@ -125,14 +130,11 @@ func TestIntegrationSecretIsImmutable(t *testing.T) {
 		_ = store.RevokeKey(context.Background(), alice.ID(), created.ID)
 	})
 
-	secrets := store.client.CoreV1().Secrets(namespace)
-	secret, err := secrets.Get(ctx, secretNamePrefix+created.ID, metav1.GetOptions{})
+	secret, err := store.client.CoreV1().Secrets(namespace).Get(ctx, store.secretName, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}
-
-	secret.Data["client-injected"] = []byte("attacker-supplied")
-	if _, err := secrets.Update(ctx, secret, metav1.UpdateOptions{}); err == nil {
-		t.Error("the API server allowed an immutable Secret to be updated")
+	if _, ok := secret.Data["client-"+created.ID]; !ok {
+		t.Errorf("aggregate secret is missing the entry the portal just patched in")
 	}
 }
