@@ -133,8 +133,13 @@ const (
 	defaultKubernetesSecretName = "llm-apikeys"
 	defaultBrandName            = "llm.birks.dev"
 	defaultBrandOrgName         = "E-gineering"
-	defaultBrandTagline         = "Private self-hosted AI endpoint"
-	defaultBrandAccent          = "#3b6fd6"
+	// defaultBrandLogoAlt describes the embedded default logo (the e-gineering
+	// mark) shipped when no BRAND_LOGO_FILE is mounted. An operator who mounts
+	// their own logo falls back to BRAND_NAME instead, since the mark is no
+	// longer theirs to describe.
+	defaultBrandLogoAlt = "e-gineering"
+	defaultBrandTagline = "Private self-hosted AI endpoint"
+	defaultBrandAccent  = "#3b6fd6"
 
 	minSessionKeyBytes = 32
 )
@@ -197,7 +202,12 @@ func Load() (*Config, error) {
 		cfg.Brand.ShortName = cfg.Brand.Name
 	}
 	if cfg.Brand.LogoAlt == "" {
-		cfg.Brand.LogoAlt = cfg.Brand.Name
+		if cfg.Brand.LogoFile == "" {
+			// Shipping the embedded default mark: describe it, not the service.
+			cfg.Brand.LogoAlt = defaultBrandLogoAlt
+		} else {
+			cfg.Brand.LogoAlt = cfg.Brand.Name
+		}
 	}
 
 	// Port.

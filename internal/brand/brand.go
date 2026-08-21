@@ -105,13 +105,22 @@ func Resolve(cfg config.BrandConfig, log *slog.Logger) (*Brand, error) {
 		SupportURL:   cfg.SupportURL,
 	}
 
+	// A mounted BRAND_LOGO_FILE is the operator override; without one the
+	// portal falls back to the embedded e-gineering mark so it ships branded
+	// with no file to wire up. Either way the bytes run through the same
+	// validation and content-addressing, so HasLogo is true and the landing and
+	// nav render a logo rather than a bare wordmark.
 	if cfg.LogoFile != "" {
 		if b.logo, err = loadAsset(cfg.LogoFile, logoURLPrefix); err != nil {
 			return nil, fmt.Errorf("BRAND_LOGO_FILE: %w", err)
 		}
-		b.HasLogo = true
-		b.LogoURL = b.logo.URLPath
+	} else {
+		if b.logo, err = buildAsset(defaultLogoSVG, "embedded default logo", logoURLPrefix); err != nil {
+			return nil, fmt.Errorf("embedded default logo: %w", err)
+		}
 	}
+	b.HasLogo = true
+	b.LogoURL = b.logo.URLPath
 	if cfg.FaviconFile != "" {
 		if b.favicon, err = loadAsset(cfg.FaviconFile, faviconURLPrefix); err != nil {
 			return nil, fmt.Errorf("BRAND_FAVICON_FILE: %w", err)
