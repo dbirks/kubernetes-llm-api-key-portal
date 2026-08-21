@@ -1,7 +1,7 @@
 id: openai
 name: OpenAI-compatible
 
-Point any OpenAI-compatible client or SDK at llm.birks.dev. These are the two variables every OpenAI SDK already reads — the official Python and Node clients, LiteLLM, LangChain, LlamaIndex, and most tools that take a custom base URL.
+Point any OpenAI-compatible client or SDK at llm.birks.dev. These are the two variables every OpenAI SDK already reads: the official Python and Node clients, LiteLLM, LangChain, LlamaIndex, and most tools that take a custom base URL.
 
 --- commands (sh) ---
 export LLM_BIRKS_DEV_API_KEY="YOUR_API_KEY"
@@ -16,7 +16,7 @@ $env:OPENAI_BASE_URL = "https://llm.birks.dev/v1"
 $env:OPENAI_API_KEY = $env:LLM_BIRKS_DEV_API_KEY
 
 --- notes ---
-- Set the request's "model" field to "Qwen3-Coder-30B". The same key reaches every model — only the base URL and model name change.
+- Set the request's "model" field to "Qwen3-Coder-30B". The same key reaches every model; only the model name changes.
 - The endpoint speaks the OpenAI Chat Completions API at /v1/chat/completions, which is what these clients use.
 - OPENAI_API_KEY reads from $LLM_BIRKS_DEV_API_KEY so the credential stays in your environment rather than a file.
 

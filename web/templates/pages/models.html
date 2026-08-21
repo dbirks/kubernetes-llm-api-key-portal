@@ -11,7 +11,7 @@
       </div>
 
       <p class="models-lede">
-        Every model shares one base URL —
+        Every model shares one base URL,
         <code>https://llm.birks.dev/v1</code>. Set the <code>model</code> field
         to one of these names. The first request to an idle model cold-starts
         while it loads on demand.
@@ -28,8 +28,10 @@
           {{range .Models}}
           <tr>
             <td class="model-cell">
-              <code class="model-name">{{.Name}}</code>
-              {{if ne .DisplayName .Name}}<span class="model-label">{{.DisplayName}}</span>{{end}}
+              {{/* The friendly label leads; the routing id (what a client puts
+                   in the "model" field) sits under it in mono. */}}
+              <span class="model-name">{{.DisplayName}}</span>
+              {{if ne .DisplayName .Name}}<code class="model-id">{{.Name}}</code>{{end}}
             </td>
             <td class="model-status-cell">
               <span class="status {{.StatusClass}}">

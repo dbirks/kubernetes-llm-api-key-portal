@@ -1,7 +1,7 @@
 id: claude-code
 name: Claude Code
 
-Point Claude Code at llm.birks.dev using gateway bearer authentication. The base URL is the Anthropic surface (no /v1 — Claude Code appends /v1/messages itself), so no translation layer is needed.
+Point Claude Code at llm.birks.dev using gateway bearer authentication. The base URL is the Anthropic surface (no /v1, since Claude Code appends /v1/messages itself), so no translation layer is needed.
 
 --- commands (sh) ---
 export LLM_BIRKS_DEV_API_KEY="YOUR_API_KEY"

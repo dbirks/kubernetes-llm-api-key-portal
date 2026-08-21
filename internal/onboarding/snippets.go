@@ -103,7 +103,7 @@ func claudeCode(r resolved) Guide {
 	return Guide{
 		ID:          "claude-code",
 		Name:        "Claude Code",
-		Description: fmt.Sprintf("Point Claude Code at %s using gateway bearer authentication. The base URL is the Anthropic surface (no /v1 — Claude Code appends /v1/messages itself), so no translation layer is needed.", r.BrandName),
+		Description: fmt.Sprintf("Point Claude Code at %s using gateway bearer authentication. The base URL is the Anthropic surface (no /v1, since Claude Code appends /v1/messages itself), so no translation layer is needed.", r.BrandName),
 		Commands:    []GuideBlock{shBlock(sh), psBlock(ps)},
 		Notes: []string{
 			"Add the exports to your shell profile to make them permanent.",
@@ -132,10 +132,10 @@ func openaiCompatible(r resolved) Guide {
 	return Guide{
 		ID:          "openai",
 		Name:        "OpenAI-compatible",
-		Description: fmt.Sprintf("Point any OpenAI-compatible client or SDK at %s. These are the two variables every OpenAI SDK already reads — the official Python and Node clients, LiteLLM, LangChain, LlamaIndex, and most tools that take a custom base URL.", r.BrandName),
+		Description: fmt.Sprintf("Point any OpenAI-compatible client or SDK at %s. These are the two variables every OpenAI SDK already reads: the official Python and Node clients, LiteLLM, LangChain, LlamaIndex, and most tools that take a custom base URL.", r.BrandName),
 		Commands:    []GuideBlock{shBlock(sh), psBlock(ps)},
 		Notes: []string{
-			fmt.Sprintf("Set the request's \"model\" field to %q. The same key reaches every model — only the base URL and model name change.", r.Model),
+			fmt.Sprintf("Set the request's \"model\" field to %q. The same key reaches every model; only the model name changes.", r.Model),
 			"The endpoint speaks the OpenAI Chat Completions API at /v1/chat/completions, which is what these clients use.",
 			fmt.Sprintf("OPENAI_API_KEY reads from $%s so the credential stays in your environment rather than a file.", r.EnvVar),
 		},

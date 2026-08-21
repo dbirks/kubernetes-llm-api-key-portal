@@ -341,6 +341,19 @@ hr {
   color: var(--ink-accent);
   border-bottom-color: var(--brand-accent, #3b6fd6);
 }
+/* The Grafana link leaves the portal, so it pairs its label with an
+   external-link glyph that sits just above the baseline. */
+.nav-link-external {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.nav-external-icon {
+  flex: none;
+  opacity: 0.75;
+  transform: translateY(-0.5px);
+}
+.nav-link-external:hover .nav-external-icon { opacity: 1; }
 
 .nav-signin {
   font-size: 12.5px;
@@ -812,13 +825,16 @@ hr {
   min-width: 0;
 }
 .model-name {
-  font: 500 13px/1.35 var(--font-mono);
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   color: var(--text);
   overflow-wrap: anywhere;
 }
-.model-label {
-  font-size: 11px;
+.model-id {
+  font: 400 11.5px/1.5 var(--font-mono);
   color: var(--text-muted);
+  overflow-wrap: anywhere;
 }
 .model-status-cell { text-align: right; white-space: nowrap; }
 
@@ -960,21 +976,6 @@ hr {
 
 .picker-model-name { white-space: nowrap; }
 
-/* A tiny classifier chip that rides inside a model tab and the endpoint list. */
-.picker-kind {
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: var(--surface-2);
-  color: var(--text-dim);
-  font: 500 9px/1.5 var(--font-mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.guide-tab[aria-selected="true"] .picker-kind {
-  background: var(--surface-accent-2);
-  color: var(--ink-accent-3);
-}
-
 /* Panels. The no-JS baseline stacks every model×client panel, each under its
    own head; app.js hides the heads and shows only the selected panel. */
 .guide-panel {
@@ -1040,65 +1041,6 @@ hr {
 }
 .agent-prompt > summary:hover { color: var(--text-2); }
 .agent-prompt .snippet { margin-top: 8px; }
-
-/* ----------------------------------------------------------- endpoints -- */
-
-.endpoints { margin-top: 12px; }
-
-.endpoints-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 14px;
-  flex-wrap: wrap;
-  margin-bottom: 12px;
-}
-.endpoints-links { display: flex; gap: 16px; flex-wrap: wrap; }
-.endpoints-link {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--ink-accent-2);
-  text-decoration: none;
-  white-space: nowrap;
-}
-.endpoints-link:hover { text-decoration: underline; }
-
-.endpoint-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  border-top: 1px solid var(--border-soft);
-}
-.endpoint-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  flex-wrap: wrap;
-  padding: 11px 2px;
-  border-bottom: 1px solid var(--border-soft);
-}
-.endpoint-headings { min-width: 0; }
-.endpoint-name {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text);
-}
-.endpoint-id {
-  display: block;
-  margin-top: 3px;
-  font: 400 11px/1.5 var(--font-mono);
-  color: var(--text-dim-2);
-}
-.endpoint-base {
-  font: 400 11.5px/1.5 var(--font-mono);
-  color: var(--ink-accent-3);
-  overflow-wrap: anywhere;
-}
-.endpoints .fine-print { margin-top: 12px; }
 
 /* ------------------------------------------------------------- snippets -- */
 
@@ -1576,8 +1518,8 @@ hr {
 }
 .metrics-card:hover .metrics-card-arrow { color: var(--ink-accent); }
 
-/* On the account page the card sits between the keys panel and the endpoints
-   summary, so it needs the same gap the panels keep between themselves. */
+/* When the card follows the keys panel it needs the same gap the panels keep
+   between themselves. */
 .account-metrics { margin-top: 12px; }
 
 /* On the centred landing panel the card is left-aligned inside, but the block

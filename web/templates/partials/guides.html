@@ -29,8 +29,6 @@
         {{range .Setups}}
         <li><button type="button" class="guide-tab picker-model-tab" data-model-target="{{.ID}}">
           <span class="picker-model-name">{{.Label}}</span>
-          {{if eq .Kind "reasoning"}}<span class="picker-kind">reasoning</span>
-          {{else if eq .Kind "coding"}}<span class="picker-kind">coding</span>{{end}}
         </button></li>
         {{end}}
       </ul>

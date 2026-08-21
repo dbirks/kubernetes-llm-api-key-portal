@@ -5,24 +5,25 @@
   <h1 class="hiw-title">How it works</h1>
 
   <p class="hiw-lede">
-    Two things happen here, and only one of them involves this portal — your
+    Two things happen here, and only one of them involves this portal. Your
     prompts never pass through it.
   </p>
 
   {{/*
-    Lane 1 — getting a key. Every node carries its own text, so the diagram
+    Lane 1: getting a key. Every node carries its own text, so the diagram
     reads correctly with animation off, with CSS off, and to a screen reader;
     the dashed connectors are decorative. It ambles (~1.9s) because this happens
-    once.
+    once. The order is the order you actually do it: open the site, sign in,
+    then create a key.
   */}}
   <div class="lane-head">
     <h2 class="lane-title">Getting a key</h2>
-    <span class="lane-badge">once · in your browser</span>
   </div>
   <div class="lane-scroll">
     <div class="flow1">
       <div class="node">
-        <span class="node-name">Get a key <span class="node-badge">once</span></span>
+        <span class="node-name">llm.birks.dev</span>
+        <span class="node-sub">open in your browser</span>
       </div>
       <div class="conn">
         <span class="conn-line" aria-hidden="true"></span>
@@ -37,8 +38,8 @@
         <span class="conn-label">create key</span>
       </div>
       <div class="node node-strong">
-        <span class="node-name">This portal</span>
-        <span class="node-sub">writes the Secret · shows the key once</span>
+        <span class="node-name">Create an API key <span class="node-badge">once</span></span>
+        <span class="node-sub">the portal writes a Kubernetes Secret · shows the key once</span>
       </div>
     </div>
   </div>
@@ -50,7 +51,7 @@
       <span class="hinge2-sub">one per key</span>
     </div>
     <p class="hinge2-text">
-      The portal writes a Kubernetes Secret — one per key — and shows the raw
+      The portal writes a Kubernetes Secret (one per key) and shows the raw
       value once. From then on it's out of the request path:
       <strong>Envoy AI Gateway</strong> checks each request's key against that
       Secret. Revoking deletes it, and anything using the key stops.
@@ -58,9 +59,8 @@
   </div>
 
   {{/*
-    Lane 2 — using the key. A vertical stepped path on the left, three
-    explainers on the right. It runs fast (~1.2s) because this happens on every
-    request.
+    Lane 2: using the key. A vertical stepped path on the left, three explainers
+    on the right. It runs fast (~1.2s) because this happens on every request.
   */}}
   <div class="lane-head">
     <h2 class="lane-title">Using the key</h2>
@@ -94,7 +94,7 @@
       </div>
       <div class="vconn">
         <span class="vconn-line" aria-hidden="true"></span>
-        <span class="vconn-label">key ok → route</span>
+        <span class="vconn-label">key ok, route</span>
       </div>
       <div class="node">
         <span class="node-name">EPP · llm-d scheduler</span>
@@ -105,7 +105,7 @@
       </div>
       <div class="node">
         <span class="node-name">vLLM on KServe</span>
-        <span class="node-sub">runs the model · NVFP4 · scales to zero when idle</span>
+        <span class="node-sub">runs the model · scales to zero when idle</span>
       </div>
     </div>
 
@@ -114,15 +114,15 @@
         <span class="explainer-title">One gateway, both jobs</span>
         <p class="explainer-body">
           <strong>Envoy AI Gateway</strong> does both jobs: it authenticates the
-          request — matching your key against its Secret — and then routes by
-          model name to the right engine.
+          request (matching your key against its Secret) and then routes by model
+          name to the right engine.
         </p>
       </div>
       <div class="explainer">
         <span class="explainer-title">One key, every model</span>
         <p class="explainer-body">
-          The same key reaches every model. Only the base URL and the
-          <code>model</code> name change between them — the
+          The same key reaches every model, and you switch between them with the
+          <code>model</code> name. The
           {{if .Models}}<a href="/models">models page</a>{{else}}models page{{end}}
           is the source of truth for which exist and where.
         </p>
@@ -131,7 +131,7 @@
         <span class="explainer-title">First request may wait</span>
         <p class="explainer-body">
           The first request to a cold model will probably take a few minutes to
-          load, or need a retry — then it's warm.
+          load, or need a retry. After that it's warm.
         </p>
       </div>
     </div>
