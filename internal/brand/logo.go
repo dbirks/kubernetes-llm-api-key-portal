@@ -3,6 +3,7 @@ package brand
 import (
 	"bytes"
 	"crypto/sha256"
+	_ "embed"
 	"encoding/hex"
 	"fmt"
 	"net/http"
@@ -15,6 +16,15 @@ import (
 // almost certainly a mistake, and the file is held in memory for the process
 // lifetime.
 const maxLogoBytes = 512 << 10 // 512 KiB
+
+// defaultLogoSVG is the built-in e-gineering mark, compiled into the binary and
+// served whenever no BRAND_LOGO_FILE is mounted. It ships branded out of the
+// box: no ConfigMap, no volume, nothing to wire up at deploy time. It is a
+// flattened single-path SVG that clears checkSVG, and it is validated and
+// content-addressed through the very same path as an operator-mounted file.
+//
+//go:embed egineering.svg
+var defaultLogoSVG []byte
 
 // Asset is an operator-supplied image served from our own origin.
 type Asset struct {
@@ -44,28 +54,35 @@ var svgHazards = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)<!ENTITY`),
 }
 
-// loadAsset reads an operator-supplied image, validates it, and prepares it for
-// serving under a content-addressed path.
+// loadAsset reads an operator-supplied image file, validates it, and prepares
+// it for serving under a content-addressed path.
 func loadAsset(path, urlPrefix string) (*Asset, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", path, err)
 	}
+	return buildAsset(data, path, urlPrefix)
+}
+
+// buildAsset validates raw image bytes from any source — a mounted file or the
+// embedded default — and prepares them for content-addressed serving. source is
+// a human-readable label used only in error messages.
+func buildAsset(data []byte, source, urlPrefix string) (*Asset, error) {
 	if len(data) == 0 {
-		return nil, fmt.Errorf("%s is empty", path)
+		return nil, fmt.Errorf("%s is empty", source)
 	}
 	if len(data) > maxLogoBytes {
-		return nil, fmt.Errorf("%s is %d bytes, limit is %d", path, len(data), maxLogoBytes)
+		return nil, fmt.Errorf("%s is %d bytes, limit is %d", source, len(data), maxLogoBytes)
 	}
 
 	contentType := detectImageType(data)
 	ext, ok := allowedImageTypes[contentType]
 	if !ok {
-		return nil, fmt.Errorf("%s: unsupported image type %q (allowed: PNG, JPEG, WebP, SVG)", path, contentType)
+		return nil, fmt.Errorf("%s: unsupported image type %q (allowed: PNG, JPEG, WebP, SVG)", source, contentType)
 	}
 	if contentType == "image/svg+xml" {
 		if err := checkSVG(data); err != nil {
-			return nil, fmt.Errorf("%s: %w", path, err)
+			return nil, fmt.Errorf("%s: %w", source, err)
 		}
 	}
 

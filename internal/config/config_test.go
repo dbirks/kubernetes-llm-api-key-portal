@@ -288,10 +288,14 @@ func TestBrandDefaults(t *testing.T) {
 	if cfg.Brand.Name != "llm.birks.dev" {
 		t.Errorf("Brand.Name = %q, want the built-in default", cfg.Brand.Name)
 	}
-	// ShortName and LogoAlt fall back to the name so templates never render
-	// an empty label.
-	if cfg.Brand.ShortName != cfg.Brand.Name || cfg.Brand.LogoAlt != cfg.Brand.Name {
-		t.Errorf("brand fallbacks not applied: %+v", cfg.Brand)
+	// ShortName falls back to the name so templates never render an empty label.
+	if cfg.Brand.ShortName != cfg.Brand.Name {
+		t.Errorf("brand short-name fallback not applied: %+v", cfg.Brand)
+	}
+	// With no mounted logo the portal ships the embedded e-gineering mark, so
+	// LogoAlt describes that mark rather than the service name.
+	if cfg.Brand.LogoAlt != defaultBrandLogoAlt {
+		t.Errorf("Brand.LogoAlt = %q, want the embedded-default alt %q", cfg.Brand.LogoAlt, defaultBrandLogoAlt)
 	}
 	if cfg.Brand.Accent != defaultBrandAccent {
 		t.Errorf("Brand.Accent = %q, want %q", cfg.Brand.Accent, defaultBrandAccent)
@@ -304,6 +308,9 @@ func TestBrandOverrides(t *testing.T) {
 	env["BRAND_SHORT_NAME"] = "Acme"
 	env["BRAND_ACCENT"] = "#0f766e"
 	env["BRAND_SUPPORT_EMAIL"] = "help@birks.dev"
+	// A mounted operator logo means the embedded default is not in play, so the
+	// alt fallback reverts to the brand name.
+	env["BRAND_LOGO_FILE"] = "/etc/brand/logo.svg"
 	setEnv(t, env)
 
 	cfg, err := Load()
@@ -313,7 +320,8 @@ func TestBrandOverrides(t *testing.T) {
 	if cfg.Brand.Name != "Acme AI" || cfg.Brand.ShortName != "Acme" {
 		t.Errorf("brand names not applied: %+v", cfg.Brand)
 	}
-	// LogoAlt still falls back to the full name, not the short one.
+	// With an operator logo mounted, LogoAlt falls back to the full name, not
+	// the short one and not the embedded-default alt.
 	if cfg.Brand.LogoAlt != "Acme AI" {
 		t.Errorf("Brand.LogoAlt = %q, want the full brand name", cfg.Brand.LogoAlt)
 	}

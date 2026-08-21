@@ -57,8 +57,13 @@ func TestResolveDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
 	}
-	if b.HasLogo {
-		t.Error("HasLogo is true with no logo configured")
+	// With no BRAND_LOGO_FILE the portal ships the embedded e-gineering mark as
+	// its default logo, so HasLogo is true and the landing renders it.
+	if !b.HasLogo {
+		t.Error("HasLogo is false; the embedded default logo should be in use")
+	}
+	if !strings.HasPrefix(b.LogoURL, logoURLPrefix) || !strings.HasSuffix(b.LogoURL, ".svg") {
+		t.Errorf("LogoURL = %q, want a content-addressed .svg for the embedded default", b.LogoURL)
 	}
 	if !strings.HasPrefix(b.StylesheetURL, "/assets/brand-") || !strings.HasSuffix(b.StylesheetURL, ".css") {
 		t.Errorf("StylesheetURL = %q, want a content-addressed css path", b.StylesheetURL)
@@ -286,6 +291,62 @@ func TestSVGLogoIsSandboxed(t *testing.T) {
 	}
 	if got := rec.Header().Get("X-Content-Type-Options"); got != "nosniff" {
 		t.Errorf("X-Content-Type-Options = %q, want nosniff", got)
+	}
+}
+
+// With no BRAND_LOGO_FILE the embedded e-gineering mark is served through the
+// same validated, content-addressed, sandboxed path as a mounted SVG, so the
+// portal ships branded without any file to wire up.
+func TestDefaultLogoIsEmbedded(t *testing.T) {
+	b, err := Resolve(baseConfig(), quietLogger())
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	if !b.HasLogo {
+		t.Fatal("HasLogo is false; expected the embedded default logo")
+	}
+	if !strings.HasSuffix(b.LogoURL, ".svg") {
+		t.Errorf("LogoURL = %q, want an .svg extension", b.LogoURL)
+	}
+
+	rec := httptest.NewRecorder()
+	b.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, b.LogoURL, nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET %s = %d, want 200", b.LogoURL, rec.Code)
+	}
+	if got := rec.Header().Get("Content-Type"); got != "image/svg+xml" {
+		t.Errorf("Content-Type = %q, want image/svg+xml", got)
+	}
+	if csp := rec.Header().Get("Content-Security-Policy"); !strings.Contains(csp, "sandbox") {
+		t.Errorf("embedded SVG CSP = %q, want a sandboxed policy", csp)
+	}
+	if !bytes.Equal(rec.Body.Bytes(), defaultLogoSVG) {
+		t.Error("served bytes differ from the embedded default logo")
+	}
+}
+
+// A mounted BRAND_LOGO_FILE overrides the embedded default: the served URL and
+// bytes are the operator's, not the built-in mark.
+func TestOperatorLogoOverridesDefault(t *testing.T) {
+	def, err := Resolve(baseConfig(), quietLogger())
+	if err != nil {
+		t.Fatalf("Resolve (default): %v", err)
+	}
+
+	cfg := baseConfig()
+	cfg.LogoFile = writeTemp(t, "logo.png", pngBytes)
+	over, err := Resolve(cfg, quietLogger())
+	if err != nil {
+		t.Fatalf("Resolve (override): %v", err)
+	}
+	if over.LogoURL == def.LogoURL {
+		t.Error("operator logo produced the same URL as the embedded default")
+	}
+
+	rec := httptest.NewRecorder()
+	over.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, over.LogoURL, nil))
+	if !bytes.Equal(rec.Body.Bytes(), pngBytes) {
+		t.Error("served bytes are not the operator-supplied logo")
 	}
 }
 

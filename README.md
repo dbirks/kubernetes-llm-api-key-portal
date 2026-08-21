@@ -275,10 +275,11 @@ service creates.
 
 ## Branding
 
-The defaults are this deployment's own identity — "llm.birks.dev", blue accent, no logo. The knobs
-below exist so the portal does not look wrong when it is run somewhere else, and so a logo can be
-dropped in without a rebuild. In Kubernetes this is one ConfigMap for the strings and one mounted
-volume for the image files.
+The defaults are this deployment's own identity — "llm.birks.dev", blue accent, and the e-gineering
+mark, which is compiled into the binary and shown unless an operator mounts their own logo. The
+knobs below exist so the portal does not look wrong when it is run somewhere else, and so a logo can
+be dropped in without a rebuild. In Kubernetes this is one ConfigMap for the strings; no mounted
+volume is needed unless you are overriding the built-in logo or favicon.
 
 This is not a white-label product; it is one deployment with a few things left adjustable.
 
@@ -288,8 +289,8 @@ This is not a white-label product; it is one deployment with a few things left a
 | `BRAND_SHORT_NAME` | = `BRAND_NAME` | Shorter form for tight layouts. |
 | `BRAND_ORG_NAME` | `E-gineering` | Organisation whose work accounts sign in. Builds the sign-in heading, "Sign in to your … account". Leave empty for a plain "Sign in". |
 | `BRAND_TAGLINE` | `Private self-hosted AI endpoint` | One-line description on the landing page and footer. |
-| `BRAND_LOGO_FILE` | — | Path to a mounted PNG, JPEG, WebP, or SVG. Without one, a text wordmark is rendered. |
-| `BRAND_LOGO_ALT` | = `BRAND_NAME` | Alt text for the logo. |
+| `BRAND_LOGO_FILE` | — | Path to a mounted PNG, JPEG, WebP, or SVG. Overrides the built-in e-gineering mark; without one, that embedded default is rendered. |
+| `BRAND_LOGO_ALT` | `e-gineering`, or `BRAND_NAME` when a logo file is mounted | Alt text for the logo. |
 | `BRAND_FAVICON_FILE` | — | Path to a mounted icon. |
 | `BRAND_ACCENT` | `#3b6fd6` | Accent colour, `#rgb` or `#rrggbb`. |
 | `BRAND_ACCENT_DARK` | derived | Explicit dark-mode accent. Derived from `BRAND_ACCENT` when unset. |
@@ -337,6 +338,11 @@ references. Export a flattened SVG, or use a PNG.
 
 A broken or missing logo file is a startup error, not a silent fallback — a mounted-but-unreadable
 logo is a deployment mistake worth hearing about immediately.
+
+When `BRAND_LOGO_FILE` is unset the portal serves an embedded default, the e-gineering mark
+(`internal/brand/egineering.svg`, compiled in with `//go:embed`). It runs through the same
+validation, content-addressing, and sandboxed serving as a mounted file, so the app ships branded
+with nothing to mount. Setting `BRAND_LOGO_FILE` replaces it.
 
 ### What is not brandable
 
